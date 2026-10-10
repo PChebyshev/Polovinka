@@ -1,0 +1,177 @@
+import { DatabaseSync } from 'node:sqlite';
+import { readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { nowIso } from './ids.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+export type Row = Record<string, unknown>;
+
+export interface UserRow {
+  id: string;
+  name: string;
+  token_hash: string;
+  pair_id: string;
+  tz: string;
+  notif_morning: string;
+  notif_evening: string;
+  notif_enabled: number;
+  last_seen_at: string | null;
+  created_at: string;
+}
+
+export interface PairRow {
+  id: string;
+  invite_code: string;
+  tz: string;
+  is_guest: number;
+  week_theme: string | null;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+export interface QuestionRow {
+  id: string;
+  pair_id: string | null;
+  author_id: string | null;
+  layer: string;
+  category: string;
+  format: string;
+  text: string;
+  a: string;
+  b: string;
+  why_chips: string | null;
+  topic: string | null;
+  is_active: number;
+  created_at: string;
+}
+
+export interface RoundRow {
+  id: string;
+  pair_id: string;
+  question_id: string;
+  date: string;
+  kind: string;
+  challenge_id: string | null;
+  status: string;
+  revealed_at: string | null;
+  created_at: string;
+}
+
+export interface AnswerRow {
+  id: string;
+  round_id: string;
+  user_id: string;
+  client_id: string | null;
+  choice: string;
+  guess: string | null;
+  why_text: string | null;
+  why_chip: string | null;
+  created_at: string;
+}
+
+export interface GestureRow {
+  id: string;
+  pair_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  type: string;
+  text: string;
+  client_id: string | null;
+  created_at: string;
+  seen_at: string | null;
+}
+
+export let db: DatabaseSync;
+
+export function openDb(dataDir: string): DatabaseSync {
+  mkdirSync(dataDir, { recursive: true });
+  db = new DatabaseSync(join(dataDir, 'polovinka.db'));
+  const schemaPath = [join(here, 'schema.sql'), join(here, '..', 'src', 'schema.sql')].find((p) => existsSync(p));
+  if (!schemaPath) throw new Error('schema.sql не найден');
+  db.exec(readFileSync(schemaPath, 'utf8'));
+  seedQuestions();
+  return db;
+}
+
+function findQuestionsJson(): string {
+  const candidates = [
+    join(here, '..', '..', 'shared', 'questions.json'),
+    join(here, '..', '..', '..', 'shared', 'questions.json'),
+    join(here, '..', '..', '..', '..', 'shared', 'questions.json'),
+    join(process.cwd(), 'shared', 'questions.json'),
+  ];
+  const found = candidates.find((p) => existsSync(p));
+  if (!found) throw new Error('shared/questions.json не найден');
+  return found;
+}
+
+interface SeedQuestion {
+  id: string;
+  layer: string;
+  category: string;
+  format?: string;
+  text: string;
+  a: string;
+  b: string;
+  topic?: string;
+  whyChips?: string[];
+}
+
+function seedQuestions() {
+  const list = JSON.parse(readFileSync(findQuestionsJson(), 'utf8')) as SeedQuestion[];
+  const upsert = db.prepare(`
+    INSERT INTO questions (id, pair_id, author_id, layer, category, format, text, a, b, why_chips, topic, is_active, created_at)
+    VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      layer = excluded.layer, category = excluded.category, format = excluded.format,
+      text = excluded.text, a = excluded.a, b = excluded.b, why_chips = excluded.why_chips, topic = excluded.topic
+  `);
+  const ts = nowIso();
+  db.exec('BEGIN');
+  try {
+    for (const q of list) {
+      upsert.run(q.id, q.layer, q.category, q.format ?? 'ab', q.text, q.a, q.b, q.whyChips ? JSON.stringify(q.whyChips) : null, q.topic ?? null, ts);
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+export function one<T = Row>(sql: string, ...params: Array<string | number | null>): T | undefined {
+  return db.prepare(sql).get(...params) as T | undefined;
+}
+
+export function all<T = Row>(sql: string, ...params: Array<string | number | null>): T[] {
+  return db.prepare(sql).all(...params) as T[];
+}
+
+export function run(sql: string, ...params: Array<string | number | null>) {
+  return db.prepare(sql).run(...params);
+}
+
+export function transaction<T>(fn: () => T): T {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const r = fn();
+    db.exec('COMMIT');
+    return r;
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+export function logEvent(type: string, opts: { pairId?: string | null; userId?: string | null; meta?: Record<string, unknown> } = {}) {
+  run(
+    'INSERT INTO events (pair_id, user_id, type, meta, created_at) VALUES (?, ?, ?, ?, ?)',
+    opts.pairId ?? null,
+    opts.userId ?? null,
+    type,
+    opts.meta ? JSON.stringify(opts.meta) : null,
+    nowIso(),
+  );
+}

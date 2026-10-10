@@ -1,0 +1,224 @@
+import { useEffect, useState } from 'react';
+import type { RoundPublic } from '@polovinka/shared';
+import { Button, Card, Chip, Confetti, Label } from './ui';
+import { api } from '../lib/api';
+import { buzz } from '../lib/share';
+
+type Stage = 'flip' | 'result' | 'why' | 'topic' | 'done';
+
+const STAGE_KEY = (id: string) => `polovinka.reveal.${id}`;
+
+function loadStage(id: string): Stage {
+  try {
+    const v = localStorage.getItem(STAGE_KEY(id));
+    if (v === 'done') return 'done';
+  } catch {
+    /* пусто */
+  }
+  return 'flip';
+}
+
+export function RevealFlow({
+  round,
+  myName,
+  partnerName,
+  onUpdated,
+  onBonus,
+  bonusLeft,
+}: {
+  round: RoundPublic;
+  myName: string;
+  partnerName: string;
+  onUpdated: (r: RoundPublic) => void;
+  onBonus?: () => void;
+  bonusLeft?: number;
+}) {
+  const [stage, setStage] = useState<Stage>(() => loadStage(round.id));
+  const [flipped, setFlipped] = useState(stage === 'done');
+  const [whyText, setWhyText] = useState('');
+  const [chip, setChip] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const q = round.question;
+  const mine = round.mine!;
+  const theirs = round.partner!;
+  const same = mine.choice === theirs.choice;
+  const iGuessed = mine.guess !== null && mine.guess === theirs.choice;
+  const theyGuessed = theirs.guess !== null && theirs.guess === mine.choice;
+  const label = (c: string) => (c === 'a' ? q.a : q.b);
+
+  useEffect(() => {
+    if (stage !== 'flip') return;
+    const t1 = window.setTimeout(() => setFlipped(true), 400);
+    const t2 = window.setTimeout(() => {
+      buzz(same ? [20, 60, 20, 60, 40] : [20, 60, 20]);
+      setStage('result');
+    }, 1300);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [stage, same]);
+
+  const finish = () => {
+    try {
+      localStorage.setItem(STAGE_KEY(round.id), 'done');
+    } catch {
+      /* пусто */
+    }
+    setStage('done');
+  };
+
+  const saveWhy = async () => {
+    if (!whyText.trim() && !chip) {
+      setStage('topic');
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await api.why(round.id, { whyText: whyText.trim() || undefined, whyChip: chip ?? undefined });
+      onUpdated(r);
+      setStage('topic');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openTopic = () => {
+    void api.topicOpened(round.id).catch(() => undefined);
+    setStage('topic');
+  };
+
+  const whyOf = (a: RoundPublic['mine']) => (a ? a.whyText || a.whyChip || null : null);
+
+  return (
+    <div className="space-y-4">
+      {stage === 'result' && same && <Confetti />}
+
+      <Card className="rise">
+        <Label>{round.kind === 'bonus' ? 'Бонусный вопрос' : 'Вопрос дня'}</Label>
+        <h2 className="mt-2 text-xl font-semibold leading-tight">{q.text}</h2>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 flip-scene">
+          {[
+            { name: myName, answer: mine },
+            { name: partnerName, answer: theirs },
+          ].map(({ name, answer }, i) => (
+            <div key={i} className={`flip-card min-h-28 ${flipped ? 'flipped' : ''}`} style={{ transitionDelay: `${i * 0.15}s` }}>
+              <div className="flip-face flex h-full min-h-28 flex-col items-center justify-center rounded-2xl border border-line bg-surface-2 p-3 text-center">
+                <div className="text-xs text-muted">{name}</div>
+                <div className="mt-2 text-3xl">?</div>
+              </div>
+              <div className={`flip-face flip-back flex h-full min-h-28 flex-col items-center justify-center rounded-2xl border p-3 text-center ${same ? 'border-sage/50 bg-sage/10' : 'border-accent/50 bg-accent/10'}`}>
+                <div className="text-xs text-muted">{name}</div>
+                <div className="mt-2 font-semibold leading-snug">{label(answer.choice)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {stage !== 'flip' && (
+          <div className="mt-5 rise">
+            <div className={`text-2xl font-semibold ${same ? 'text-sage' : 'text-sand'}`}>{same ? 'Совпали!' : 'Новое открытие'}</div>
+            <p className="mt-1 text-muted">
+              {same ? 'Вы выбрали одно и то же. Так держать.' : 'Вы узнали друг о друге новое. Это и есть открытие.'}
+            </p>
+            <div className="mt-3 space-y-1 text-sm">
+              <div>
+                {iGuessed ? '✓' : '○'} Я думаю, {partnerName} выберет: {mine.guess ? label(mine.guess) : '—'}
+                {mine.guess && <span className="text-muted"> — {iGuessed ? 'в точку' : 'мимо, зато теперь знаю'}</span>}
+              </div>
+              <div>
+                {theyGuessed ? '✓' : '○'} {partnerName} думает, я выберу: {theirs.guess ? label(theirs.guess) : '—'}
+                {theirs.guess && <span className="text-muted"> — {theyGuessed ? 'в точку' : 'мимо'}</span>}
+              </div>
+            </div>
+            {(whyOf(mine) || whyOf(theirs)) && (
+              <div className="mt-3 space-y-1 rounded-2xl bg-surface-2 px-4 py-3 text-sm">
+                {whyOf(mine) && (
+                  <div>
+                    <span className="text-muted">Я — почему:</span> {whyOf(mine)}
+                  </div>
+                )}
+                {whyOf(theirs) && (
+                  <div>
+                    <span className="text-muted">{partnerName} — почему:</span> {whyOf(theirs)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {stage === 'result' && (
+        <div className="flex gap-3 rise-2">
+          {!whyOf(mine) ? (
+            <Button className="flex-1" big onClick={() => setStage('why')}>
+              Почему?
+            </Button>
+          ) : null}
+          <Button variant="secondary" className="flex-1" big onClick={openTopic}>
+            Тема на вечер
+          </Button>
+        </div>
+      )}
+
+      {stage === 'why' && (
+        <Card className="rise">
+          <Label>Почему? Необязательно</Label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {q.whyChips.map((c) => (
+              <Chip key={c} active={chip === c} onClick={() => setChip(chip === c ? null : c)}>
+                {c}
+              </Chip>
+            ))}
+          </div>
+          <input
+            className="mt-3 w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 outline-none focus:border-accent/60"
+            placeholder="Или одной строкой…"
+            maxLength={200}
+            value={whyText}
+            onChange={(e) => setWhyText(e.target.value)}
+            enterKeyHint="done"
+            onKeyDown={(e) => e.key === 'Enter' && void saveWhy()}
+          />
+          <div className="mt-3 flex gap-3">
+            <Button variant="ghost" onClick={() => setStage('topic')} disabled={busy}>
+              Пропустить
+            </Button>
+            <Button className="flex-1" onClick={saveWhy} disabled={busy}>
+              Сохранить
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {stage === 'topic' && (
+        <Card tone="accent" className="rise">
+          <Label>Тема на вечер</Label>
+          <p className="mt-2 text-lg leading-snug">{q.topic ?? 'Расскажите друг другу, почему выбрали именно так.'}</p>
+          <Button className="mt-4 w-full" onClick={finish}>
+            На сегодня всё
+          </Button>
+        </Card>
+      )}
+
+      {stage === 'done' && (
+        <div className="space-y-3 rise">
+          {q.topic && (
+            <div className="rounded-2xl bg-surface-2 px-4 py-3 text-sm">
+              <span className="text-muted">Тема на вечер: </span>
+              {q.topic}
+            </div>
+          )}
+          {onBonus && (bonusLeft ?? 0) > 0 && (
+            <Button variant="secondary" className="w-full" onClick={onBonus}>
+              Ещё один вопрос? Осталось {bonusLeft}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

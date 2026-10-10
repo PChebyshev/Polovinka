@@ -1,0 +1,17 @@
+{
+  "name": "polovinka",
+  "private": true,
+  "workspaces": ["shared", "server", "web"],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w shared && npm run build -w web && npm run build -w server",
+    "start": "npm start -w server",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web",
+    "check:questions": "node shared/scripts/check-questions.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "~5.9.3"
+  },
+  "engines": { "node": ">=22.13" }
+}

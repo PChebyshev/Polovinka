@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #1b1412;
+  --color-surface: #261c18;
+  --color-surface-2: #33251f;
+  --color-line: #40302a;
+  --color-text: #f6ece4;
+  --color-muted: #b89f93;
+  --color-accent: #e8875f;
+  --color-accent-soft: #f0a988;
+  --color-sand: #f2cc8f;
+  --color-sage: #8fbf9f;
+  --color-rose: #e26d8a;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+}
+
+button, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Мягкое появление экранов */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise 0.35s ease-out both; }
+.rise-2 { animation: rise 0.35s ease-out 0.12s both; }
+.rise-3 { animation: rise 0.35s ease-out 0.24s both; }
+
+/* Переворот карточек при раскрытии */
+.flip-scene { perspective: 1000px; }
+.flip-card {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.flip-card.flipped { transform: rotateY(180deg); }
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-back { transform: rotateY(180deg); position: absolute; inset: 0; }
+
+/* Пульс ожидания */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+.breathe { animation: breathe 3s ease-in-out infinite; }
+
+/* Конфетти */
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--dx), 110vh, 0) rotate(720deg); opacity: 0; }
+}
+.confetti {
+  position: fixed;
+  top: 0;
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confetti-fall var(--dur) ease-in forwards;
+  animation-delay: var(--delay);
+  z-index: 50;
+}
+
+/* Сердце, которое «вздыхает» */
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pop { animation: pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise, .rise-2, .rise-3, .pop { animation-duration: 0.01s; animation-delay: 0s; }
+  .flip-card { transition-duration: 0.01s; }
+  .breathe, .confetti { animation: none; }
+}

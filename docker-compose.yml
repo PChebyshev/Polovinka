@@ -1,0 +1,33 @@
+# Боевой запуск на VPS: приложение + Caddy с автоматическим TLS.
+# 1. Направьте A-запись домена на сервер.
+# 2. Укажите домен: export DOMAIN=example.ru
+# 3. docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: https://${DOMAIN:-localhost}
+      STATS_KEY: ${STATS_KEY:-}
+    volumes:
+      - app-data:/data
+    expose:
+      - "8787"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:
