@@ -48,8 +48,12 @@ export interface PickOptions {
   kind: 'daily' | 'bonus';
   seedSalt?: string;
   allowFormats?: string[];
-  /** Пока в паре один человек — только лёгкие вопросы. */
+  /** Пока в паре один человек — только лёгкие вопросы формата A/B. */
   solo?: boolean;
+  /** Тема недели: категория, которой даём больший вес. */
+  theme?: string | null;
+  /** Исключить конкретные вопросы (например, после «не про нас» в текущем раунде). */
+  exclude?: string[];
 }
 
 /** Статистика по категориям: сколько раскрыто и сколько раз не угадали. */
@@ -73,8 +77,8 @@ function categoryStats(pairId: string): Map<string, { revealed: number; missed: 
 
 export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
   const rnd = mulberry32(hashSeed(`${opts.pairId}|${opts.date}|${opts.kind}|${opts.seedSalt ?? ''}`));
-  // Форматы-сюрпризы включаются на этапе 2; пока только «A или B».
-  const allowFormats = opts.allowFormats ?? ['ab'];
+  const allowFormats = opts.allowFormats ?? (opts.solo ? ['ab'] : ['ab', 'who', 'scale']);
+  const exclude = new Set(opts.exclude ?? []);
 
   const used = new Set(all<{ question_id: string }>('SELECT question_id FROM rounds WHERE pair_id = ?', opts.pairId).map((r) => r.question_id));
   const marked = all<{ question_id: string; category: string }>(
@@ -88,7 +92,7 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
   const candidates = all<QuestionRow>(
     `SELECT * FROM questions WHERE is_active = 1 AND (pair_id IS NULL OR pair_id = ?)`,
     opts.pairId,
-  ).filter((q) => !used.has(q.id) && !markedIds.has(q.id) && allowFormats.includes(q.format) && (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY);
+  ).filter((q) => !used.has(q.id) && !exclude.has(q.id) && !markedIds.has(q.id) && allowFormats.includes(q.format) && (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY);
 
   if (candidates.length === 0) return undefined;
 
@@ -133,7 +137,8 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
     const s = stats.get(q.category);
     const missRate = s && s.revealed > 0 ? s.missed / (s.revealed * 2) : 0;
     const marks = marksByCategory.get(q.category) ?? 0;
-    return Math.max(0.1, 1 + missRate * 2 - marks * 0.5);
+    const theme = opts.theme && q.category === opts.theme ? 3 : 1;
+    return Math.max(0.1, (1 + missRate * 2 - marks * 0.5) * theme);
   };
   return weightedPick(pool, weightOf, rnd);
 }

@@ -3,13 +3,14 @@ import type { RoundPublic } from '@polovinka/shared';
 import { Button, Card, Heart, Label } from './ui';
 import { api } from '../lib/api';
 import { shareText, type ShareResult } from '../lib/share';
+import { choiceLabel } from '../lib/format';
 
 export function WaitingCard({ round, partnerName }: { round: RoundPublic; partnerName: string | null }) {
   const [state, setState] = useState<ShareResult | 'busy' | null>(null);
   const [manual, setManual] = useState<string | null>(null);
   const q = round.question;
-  const myChoice = round.mine?.choice === 'a' ? q.a : q.b;
-  const myGuess = round.mine?.guess ? (round.mine.guess === 'a' ? q.a : q.b) : null;
+  const myChoice = choiceLabel(q, round.mine?.choice ?? null);
+  const myGuess = round.mine?.guess ? choiceLabel(q, round.mine.guess) : null;
 
   const call = async () => {
     setState('busy');

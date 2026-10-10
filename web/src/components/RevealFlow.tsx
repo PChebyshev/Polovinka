@@ -42,10 +42,13 @@ export function RevealFlow({
   const q = round.question;
   const mine = round.mine!;
   const theirs = round.partner!;
+  const isScale = q.format === 'scale';
+  const diff = (x: string | null, y: string | null) => (x === null || y === null ? 99 : Math.abs(Number(x) - Number(y)));
   const same = mine.choice === theirs.choice;
-  const iGuessed = mine.guess !== null && mine.guess === theirs.choice;
-  const theyGuessed = theirs.guess !== null && theirs.guess === mine.choice;
-  const label = (c: string) => (c === 'a' ? q.a : q.b);
+  const close = isScale && !same && diff(mine.choice, theirs.choice) === 1;
+  const iGuessed = mine.guess !== null && (isScale ? diff(mine.guess, theirs.choice) <= 1 : mine.guess === theirs.choice);
+  const theyGuessed = theirs.guess !== null && (isScale ? diff(theirs.guess, mine.choice) <= 1 : theirs.guess === mine.choice);
+  const label = (c: string) => (isScale ? `${c} из 5` : c === 'a' ? q.a : q.b);
 
   useEffect(() => {
     if (stage !== 'flip') return;
@@ -96,7 +99,10 @@ export function RevealFlow({
       {stage === 'result' && same && <Confetti />}
 
       <Card className="rise">
-        <Label>{round.kind === 'bonus' ? 'Бонусный вопрос' : 'Вопрос дня'}</Label>
+        <div className="flex items-center justify-between">
+          <Label>{round.kind === 'bonus' ? 'Бонусный вопрос' : 'Вопрос дня'}</Label>
+          {q.isCustom && <Label>{q.authorName ? `Вопрос от: ${q.authorName}` : 'Ваш вопрос'}</Label>}
+        </div>
         <h2 className="mt-2 text-xl font-semibold leading-tight">{q.text}</h2>
 
         <div className="mt-5 grid grid-cols-2 gap-3 flip-scene">
@@ -119,10 +125,15 @@ export function RevealFlow({
 
         {stage !== 'flip' && (
           <div className="mt-5 rise">
-            <div className={`text-2xl font-semibold ${same ? 'text-sage' : 'text-sand'}`}>{same ? 'Совпали!' : 'Новое открытие'}</div>
+            <div className={`text-2xl font-semibold ${same ? 'text-sage' : close ? 'text-sage' : 'text-sand'}`}>{same ? 'Совпали!' : close ? 'Почти совпали' : 'Новое открытие'}</div>
             <p className="mt-1 text-muted">
-              {same ? 'Вы выбрали одно и то же. Так держать.' : 'Вы узнали друг о друге новое. Это и есть открытие.'}
+              {same ? 'Вы выбрали одно и то же. Так держать.' : close ? 'Разница в одно деление. Вы рядом.' : 'Вы узнали друг о друге новое. Это и есть открытие.'}
             </p>
+            {isScale && (
+              <div className="mt-2 text-xs text-muted">
+                1 — {q.a} · 5 — {q.b}
+              </div>
+            )}
             <div className="mt-3 space-y-1 text-sm">
               <div>
                 {iGuessed ? '✓' : '○'} Я думаю, {partnerName} выберет: {mine.guess ? label(mine.guess) : '—'}

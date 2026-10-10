@@ -8,6 +8,8 @@ import { dateInTz, isValidTz } from './time.js';
 import { pickQuestion } from './selection.js';
 import { counters, gesturePublic, pairPublic, partnerOf, roundPublic, userPublic } from './serialize.js';
 import { addClient, sendTo } from './sse.js';
+import { checkMilestones, unseenCelebrations } from './levels.js';
+import { registerStage2Routes, gestureTemplatesOf } from './routes2.js';
 
 const MAX_BONUS_PER_DAY = 3;
 const NAME_MAX = 24;
@@ -51,7 +53,7 @@ function ensureDaily(pair: PairRow, date: string): RoundRow | undefined {
   const existing = one<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'daily'`, pair.id, date);
   if (existing) return existing;
   const members = one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE pair_id = ?', pair.id);
-  const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'daily', solo: Number(members?.n ?? 1) < 2 });
+  const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'daily', solo: Number(members?.n ?? 1) < 2, theme: pair.week_theme });
   if (!q) return undefined;
   run(
     `INSERT OR IGNORE INTO rounds (id, pair_id, question_id, date, kind, status, created_at) VALUES (?, ?, ?, ?, 'daily', 'open', ?)`,
@@ -75,7 +77,19 @@ function meResponse(user: UserRow): MeResponse {
     counters: counters(pair.id),
     inviteCode: pair.invite_code,
     unseenGestures: unseen.map(gesturePublic),
+    celebrations: unseenCelebrations(pair.id, user.id),
+    weekTheme: pair.week_theme,
+    gestureTemplates: gestureTemplatesOf(pair.id),
   };
+}
+
+/** Проверка и нормализация ответа по формату вопроса. Для «кто из нас» храним id человека. */
+function normalizeChoice(raw: unknown, format: string, me: UserRow, partner: UserRow | undefined): string | null {
+  if (typeof raw !== 'string') return null;
+  if (format === 'scale') return /^[1-5]$/.test(raw) ? raw : null;
+  if (raw !== 'a' && raw !== 'b') return null;
+  if (format === 'who') return raw === 'a' ? me.id : partner?.id ?? null;
+  return raw;
 }
 
 export async function registerRoutes(app: FastifyInstance) {
@@ -124,6 +138,8 @@ export async function registerRoutes(app: FastifyInstance) {
   });
 
   app.get('/api/me', { preHandler: requireUser }, async (req) => meResponse(req.user!));
+
+  await registerStage2Routes(app, { meResponse });
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };
@@ -237,7 +253,7 @@ export async function registerRoutes(app: FastifyInstance) {
     const date = dateInTz(pair.tz);
     const count = one<{ n: number }>(`SELECT COUNT(*) AS n FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'bonus'`, pair.id, date);
     if (Number(count?.n ?? 0) >= MAX_BONUS_PER_DAY) return reply.code(409).send({ error: 'bonus_limit' });
-    const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'bonus', seedSalt: String(count?.n ?? 0), solo: !partner });
+    const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'bonus', seedSalt: String(count?.n ?? 0), solo: !partner, theme: pair.week_theme });
     if (!q) return reply.code(503).send({ error: 'no_questions_left' });
     const id = newId();
     run(`INSERT INTO rounds (id, pair_id, question_id, date, kind, status, created_at) VALUES (?, ?, ?, ?, 'bonus', 'open', ?)`, id, pair.id, q.id, date, nowIso());
@@ -259,11 +275,12 @@ export async function registerRoutes(app: FastifyInstance) {
     const body = (req.body ?? {}) as { choice?: unknown; guess?: unknown; clientId?: unknown };
     const round = one<RoundRow>('SELECT * FROM rounds WHERE id = ? AND pair_id = ?', (req.params as { id: string }).id, user.pair_id);
     if (!round) return reply.code(404).send({ error: 'round_not_found' });
-    const choice = body.choice === 'a' || body.choice === 'b' ? body.choice : null;
-    const guess = body.guess === 'a' || body.guess === 'b' ? body.guess : null;
+    const partner = partnerOf(user);
+    const format = one<{ format: string }>('SELECT format FROM questions WHERE id = ?', round.question_id)?.format ?? 'ab';
+    const choice = normalizeChoice(body.choice, format, user, partner);
+    const guess = body.guess == null ? null : normalizeChoice(body.guess, format, user, partner);
     if (!choice) return reply.code(400).send({ error: 'choice' });
     const clientId = typeof body.clientId === 'string' && body.clientId.length <= 64 ? body.clientId : null;
-    const partner = partnerOf(user);
 
     const existing = one<AnswerRow>('SELECT * FROM answers WHERE round_id = ? AND user_id = ?', round.id, user.id);
     if (existing) {
@@ -290,6 +307,9 @@ export async function registerRoutes(app: FastifyInstance) {
       }
     });
     logEvent('answer', { pairId: user.pair_id, userId: user.id, meta: { kind: round.kind } });
+    const c = counters(user.pair_id);
+    const fresh_milestones = checkMilestones(user.pair_id, c.discoveries, c.daysTogether);
+    if (fresh_milestones.length) logEvent('milestone', { pairId: user.pair_id, meta: { keys: fresh_milestones } });
     if (revealed) {
       logEvent('reveal', { pairId: user.pair_id, meta: { kind: round.kind } });
       sendTo(partner?.id, { type: 'revealed', roundId: round.id });

@@ -18,6 +18,7 @@ export function Gesture() {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   if (!me) return null;
   if (!me.partner) {
@@ -39,6 +40,12 @@ export function Gesture() {
     }
     const parts = [chip, extra].filter(Boolean);
     return parts.length ? parts.join('. ') : base;
+  };
+
+  const saveTemplate = async () => {
+    await api.addTemplate(type, text.trim());
+    setSaved(true);
+    void refresh();
   };
 
   const send = async () => {
@@ -77,7 +84,7 @@ export function Gesture() {
       <Card className="mt-4">
         <Label>Готовые варианты</Label>
         <div className="mt-3 flex flex-wrap gap-2">
-          {GESTURE_CHIPS[type].map((c) => (
+          {[...me.gestureTemplates.filter((t) => t.type === type).map((t) => t.text), ...GESTURE_CHIPS[type]].map((c) => (
             <Chip key={c} active={chip === c} onClick={() => setChip(chip === c ? null : c)}>
               {c}
             </Chip>
@@ -102,6 +109,12 @@ export function Gesture() {
       <Button className="mt-4 w-full" big onClick={send} disabled={busy || sent}>
         {sent ? 'Отправлено ♥' : 'Отправить'}
       </Button>
+      {text.trim() && !saved && (
+        <button className="mt-3 w-full text-center text-xs text-muted underline decoration-dotted" onClick={saveTemplate}>
+          Сохранить «{text.trim()}» как свой шаблон
+        </button>
+      )}
+      {saved && <p className="mt-3 text-center text-xs text-sage">Шаблон сохранён</p>}
     </div>
   );
 }

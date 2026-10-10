@@ -9,6 +9,7 @@ import { WaitingCard } from '../components/WaitingCard';
 import { InviteCard } from '../components/InviteCard';
 import { RevealFlow } from '../components/RevealFlow';
 import { GestureCard } from '../components/GestureToast';
+import { LevelBar } from '../components/LevelBar';
 
 export function Home() {
   const { me, today, setToday, refresh, error, offline } = useStore();
@@ -26,7 +27,7 @@ export function Home() {
       return { ...prev, daily: swap(prev.daily), bonus: prev.bonus.map(swap), pending: prev.pending.map(swap) };
     });
 
-  const answer = async (round: RoundPublic, choice: 'a' | 'b', guess: 'a' | 'b' | null) => {
+  const answer = async (round: RoundPublic, choice: string, guess: string | null) => {
     setBusy(true);
     // Оптимистично: ответ сохраняется сразу, экран не ждёт сеть.
     patchRound({ ...round, mine: { userId: me.user.id, choice, guess, whyText: null, whyChip: null, createdAt: new Date().toISOString() } });
@@ -53,13 +54,34 @@ export function Home() {
     }
   };
 
+  const skip = async (round: RoundPublic) => {
+    setBusy(true);
+    try {
+      const r = await api.skipRound(round.id);
+      patchRound(r.round);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const seenGesture = async (id: string) => {
     await api.gestureSeen(id).catch(() => undefined);
     void refresh();
   };
 
   const renderRound = (round: RoundPublic, title?: string) => {
-    if (!round.mine) return <QuestionCard key={round.id} round={round} partnerName={partner?.name ?? null} onAnswer={(c, g) => answer(round, c, g)} busy={busy} title={title} />;
+    if (!round.mine)
+      return (
+        <QuestionCard
+          key={`${round.id}:${round.question.id}`}
+          round={round}
+          partnerName={partner?.name ?? null}
+          onAnswer={(c, g) => answer(round, c, g)}
+          onSkip={() => skip(round)}
+          busy={busy}
+          title={title}
+        />
+      );
     if (round.status === 'revealed' && round.partner && partner) {
       return (
         <RevealFlow
@@ -93,6 +115,7 @@ export function Home() {
           <div>{nDays(c.daysTogether)} вместе в игре</div>
         </div>
       </header>
+      {partner && <LevelBar counters={c} />}
 
       {offline && <div className="mb-3 rounded-2xl bg-surface-2 px-4 py-2 text-center text-xs text-muted">Нет сети. Ответы сохранятся и отправятся, когда она появится.</div>}
 

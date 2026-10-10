@@ -23,3 +23,15 @@ export function matchPercent(matches: number, discoveries: number): number | nul
   if (discoveries === 0) return null;
   return Math.round((matches / discoveries) * 100);
 }
+
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Подпись выбора с учётом формата вопроса. */
+export function choiceLabel(q: { format: string; a: string; b: string }, choice: string | null): string {
+  if (choice === null) return '—';
+  if (q.format === 'scale') return `${choice} из 5`;
+  return choice === 'a' ? q.a : q.b;
+}

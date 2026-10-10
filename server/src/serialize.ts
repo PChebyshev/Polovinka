@@ -1,6 +1,7 @@
 import type { AnswerPublic, Counters, GesturePublic, Layer, PairPublic, QuestionFormat, RoundPublic, UserPublic } from '../../shared/src/types.js';
 import { renderText } from '../../shared/src/text.js';
 import { all, one, type AnswerRow, type GestureRow, type PairRow, type QuestionRow, type RoundRow, type UserRow } from './db.js';
+import { levelFor } from './levels.js';
 
 export const DEFAULT_WHY_CHIPS: Record<string, string[]> = {
   food: ['Просто вкуснее', 'Привычка с детства', 'Настроение такое', 'Так уютнее', 'Не могу объяснить, но да'],
@@ -35,11 +36,17 @@ export function pairPublic(p: PairRow): PairPublic {
   return { id: p.id, tz: p.tz, createdAt: p.created_at, isGuest: !!p.is_guest };
 }
 
-export function answerPublic(a: AnswerRow): AnswerPublic {
+/** Для формата «кто из нас» в базе лежит id человека; наружу отдаём букву относительно зрителя. */
+function relative(value: string | null, format: string, viewerId: string): string | null {
+  if (value === null || format !== 'who') return value;
+  return value === viewerId ? 'a' : 'b';
+}
+
+export function answerPublic(a: AnswerRow, format = 'ab', viewerId = ''): AnswerPublic {
   return {
     userId: a.user_id,
-    choice: a.choice,
-    guess: a.guess,
+    choice: relative(a.choice, format, viewerId) ?? a.choice,
+    guess: relative(a.guess, format, viewerId),
     whyText: a.why_text,
     whyChip: a.why_chip,
     createdAt: a.created_at,
@@ -70,6 +77,7 @@ export function roundPublic(round: RoundRow, viewer: UserRow, partner: UserRow |
   const me = viewer.name;
   const them = partner?.name ?? 'половинка';
   const chips = q.why_chips ? (JSON.parse(q.why_chips) as string[]) : DEFAULT_WHY_CHIPS[q.category] ?? DEFAULT_WHY_CHIPS[q.layer] ?? DEFAULT_WHY_CHIPS.light;
+  const authorName = q.pair_id && q.author_id && q.author_id !== viewer.id ? (partner?.name ?? null) : null;
   return {
     id: round.id,
     kind: round.kind as RoundPublic['kind'],
@@ -87,10 +95,11 @@ export function roundPublic(round: RoundRow, viewer: UserRow, partner: UserRow |
       whyChips: chips,
       topic: q.topic ? renderText(q.topic, me, them) : null,
       isCustom: !!q.pair_id,
+      authorName,
     },
-    mine: mine ? answerPublic(mine) : null,
+    mine: mine ? answerPublic(mine, q.format, viewer.id) : null,
     partnerAnswered: !!theirs,
-    partner: round.status === 'revealed' && theirs ? answerPublic(theirs) : null,
+    partner: round.status === 'revealed' && theirs ? answerPublic(theirs, q.format, viewer.id) : null,
   };
 }
 
@@ -114,8 +123,10 @@ export function counters(pairId: string): Counters {
     pairId,
   );
   const gestures = one<{ n: number }>('SELECT COUNT(*) AS n FROM gestures WHERE pair_id = ?', pairId);
+  const d = Number(discoveries?.n ?? 0);
   return {
-    discoveries: Number(discoveries?.n ?? 0),
+    ...levelFor(d),
+    discoveries: d,
     matches: Number(matches?.n ?? 0),
     guessesRight: Number(guesses?.n ?? 0),
     daysTogether: Number(days?.n ?? 0),

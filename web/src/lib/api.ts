@@ -1,4 +1,4 @@
-import type { GesturePublic, MeResponse, RoundPublic, TodayResponse } from '@polovinka/shared';
+import type { CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse } from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
 
@@ -67,7 +67,7 @@ export const api = {
   join: (code: string) => request<MeResponse>('POST', '/api/pair/join', { code }),
   today: () => request<TodayResponse>('GET', '/api/today'),
   round: (id: string) => request<RoundPublic>('GET', `/api/rounds/${id}`),
-  answer: (roundId: string, choice: 'a' | 'b', guess: 'a' | 'b' | null, cid: string) =>
+  answer: (roundId: string, choice: string, guess: string | null, cid: string) =>
     request<RoundPublic>('POST', `/api/rounds/${roundId}/answer`, { choice, guess, clientId: cid }),
   why: (roundId: string, data: { whyText?: string; whyChip?: string }) => request<RoundPublic>('POST', `/api/rounds/${roundId}/why`, data),
   topicOpened: (roundId: string) => request<{ ok: true }>('POST', `/api/rounds/${roundId}/topic-opened`),
@@ -78,4 +78,16 @@ export const api = {
   gestures: () => request<{ gestures: GesturePublic[] }>('GET', '/api/gestures'),
   gestureSeen: (id: string) => request<{ ok: true }>('POST', `/api/gestures/${id}/seen`),
   deleteHistory: () => request<{ ok: true }>('DELETE', '/api/pair/history'),
+  // Этап 2
+  history: (before?: string | null, favorites = false) =>
+    request<HistoryResponse>('GET', `/api/history?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}${favorites ? '&favorites=1' : ''}`),
+  toggleFavorite: (kind: 'round' | 'gesture', refId: string) => request<{ favorite: boolean }>('POST', '/api/favorites/toggle', { kind, refId }),
+  milestoneSeen: (key: string) => request<{ ok: true }>('POST', `/api/milestones/${encodeURIComponent(key)}/seen`),
+  skipRound: (roundId: string) => request<{ replaced: boolean; round: RoundPublic }>('POST', `/api/rounds/${roundId}/skip`),
+  customQuestions: () => request<{ questions: CustomQuestion[] }>('GET', '/api/questions/custom'),
+  addQuestion: (data: { text: string; a: string; b: string; layer: string; topic?: string }) => request<CustomQuestion>('POST', '/api/questions', data),
+  deleteQuestion: (id: string) => request<{ ok: true }>('DELETE', `/api/questions/${id}`),
+  addTemplate: (type: string, text: string) => request<{ templates: GestureTemplate[] }>('POST', '/api/gesture-templates', { type, text }),
+  deleteTemplate: (id: string) => request<{ templates: GestureTemplate[] }>('DELETE', `/api/gesture-templates/${id}`),
+  setTheme: (theme: string | null) => request<MeResponse>('PUT', '/api/pair/theme', { theme }),
 };

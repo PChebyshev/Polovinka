@@ -43,7 +43,77 @@ export interface Counters {
   guessesRight: number;
   daysTogether: number;
   gestures: number;
+  level: number;
+  /** Открытий до следующего уровня; null на последнем. */
+  nextLevelAt: number | null;
+  levelStartAt: number;
 }
+
+export interface Celebration {
+  key: string;
+  title: string;
+  subtitle: string;
+}
+
+export interface CustomQuestion {
+  id: string;
+  text: string;
+  a: string;
+  b: string;
+  layer: Layer;
+  topic: string | null;
+  authorId: string;
+  createdAt: string;
+  used: boolean;
+}
+
+export interface GestureTemplate {
+  id: string;
+  type: GestureType;
+  text: string;
+  createdAt: string;
+}
+
+export interface HistoryRound {
+  type: 'round';
+  at: string;
+  round: RoundPublic;
+  favoriteMine: boolean;
+  favoritePartner: boolean;
+}
+
+export interface HistoryGesture {
+  type: 'gesture';
+  at: string;
+  gesture: GesturePublic;
+  favoriteMine: boolean;
+  favoritePartner: boolean;
+}
+
+export type HistoryItem = HistoryRound | HistoryGesture;
+
+export interface HistoryResponse {
+  items: HistoryItem[];
+  nextBefore: string | null;
+}
+
+export const LEVELS = [0, 5, 10, 25, 50, 100, 200, 365];
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  food: 'Еда',
+  rest: 'Отдых',
+  home: 'Быт',
+  weird: 'Странное',
+  whatif: 'А если бы',
+  memories: 'Воспоминания',
+  habits: 'Привычки',
+  joy: 'Что радует',
+  dreams: 'Мечты',
+  values: 'Ценности',
+  support: 'Поддержка',
+};
+
+export const LAYER_LABELS: Record<Layer, string> = { light: 'Лёгкий', us: 'Про нас', deep: 'Поглубже' };
 
 export interface AnswerPublic {
   userId: string;
@@ -71,6 +141,8 @@ export interface RoundPublic {
     whyChips: string[];
     topic: string | null;
     isCustom: boolean;
+    /** Имя автора своего вопроса, если это не я. */
+    authorName: string | null;
   };
   /** Мой ответ, если есть. */
   mine: AnswerPublic | null;
@@ -97,6 +169,9 @@ export interface MeResponse {
   counters: Counters;
   inviteCode: string;
   unseenGestures: GesturePublic[];
+  celebrations: Celebration[];
+  weekTheme: string | null;
+  gestureTemplates: GestureTemplate[];
 }
 
 export interface TodayResponse {
@@ -116,6 +191,8 @@ export type ServerEvent =
   | { type: 'bonus_added'; roundId: string }
   | { type: 'gesture'; gesture: GesturePublic }
   | { type: 'history_deleted' }
+  | { type: 'round_replaced'; roundId: string }
+  | { type: 'pair_updated' }
   | { type: 'ping' };
 
 export const GESTURE_LABELS: Record<GestureType, string> = {

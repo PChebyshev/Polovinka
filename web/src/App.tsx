@@ -6,6 +6,8 @@ import { Home } from './screens/Home';
 import { Join } from './screens/Join';
 import { Gesture } from './screens/Gesture';
 import { Settings } from './screens/Settings';
+import { History } from './screens/History';
+import { CelebrationOverlay } from './components/Celebration';
 import { Spinner, Heart } from './components/ui';
 import { GestureCard } from './components/GestureToast';
 import { api } from './lib/api';
@@ -36,6 +38,14 @@ function Nav() {
           </svg>,
         )}
         {item('/gesture', 'Жест', <Heart className="h-6 w-6" filled={false} />)}
+        {item(
+          '/history',
+          'История',
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>,
+        )}
         {item(
           '/settings',
           'Настройки',
@@ -68,6 +78,17 @@ function Toast() {
   );
 }
 
+function Celebrations() {
+  const { me, refresh } = useStore();
+  if (!me || me.celebrations.length === 0) return null;
+  const c = me.celebrations[0];
+  const close = async () => {
+    await api.milestoneSeen(c.key).catch(() => undefined);
+    void refresh();
+  };
+  return <CelebrationOverlay c={c} pairTitle={me.partner ? `${me.user.name} и ${me.partner.name}` : me.user.name} onClose={close} />;
+}
+
 function Shell() {
   const { ready, me } = useStore();
   const loc = useLocation();
@@ -79,11 +100,13 @@ function Shell() {
         <Route path="/" element={<Home />} />
         <Route path="/gesture" element={<Gesture />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/history" element={<History />} />
         <Route path="/j/:code" element={<Join />} />
         <Route path="*" element={<Home />} />
       </Routes>
       <Nav />
       <Toast />
+      <Celebrations />
     </>
   );
 }

@@ -105,7 +105,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (data.type === 'gesture') setToast(data.gesture);
       if (data.type !== 'ping') void refresh();
     };
-    for (const t of ['pair_joined', 'partner_answered', 'revealed', 'why_added', 'bonus_added', 'gesture', 'history_deleted']) {
+    for (const t of ['pair_joined', 'partner_answered', 'revealed', 'why_added', 'bonus_added', 'gesture', 'history_deleted', 'round_replaced', 'pair_updated']) {
       es.addEventListener(t, handle as EventListener);
     }
     return () => {
