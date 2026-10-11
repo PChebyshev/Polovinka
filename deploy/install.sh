@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Установка «Мы на %» на чистый Ubuntu-сервер (рассчитан на облачный сервер Timeweb Cloud).
+# Установка «Половинки» на чистый Ubuntu-сервер (рассчитан на облачный сервер Timeweb Cloud).
 # Запуск под root:
 #   curl -fsSL https://raw.githubusercontent.com/PChebyshev/Polovinka/claude/plan-and-data-model/deploy/install.sh | bash
 # Можно заранее задать переменные: DOMAIN, STATS_KEY, VAPID_EMAIL, BRANCH, APP_DIR.

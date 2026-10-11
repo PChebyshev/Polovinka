@@ -1,7 +1,9 @@
+import { APP_NAME } from '@polovinka/shared';
+
 export type ShareResult = 'shared' | 'copied' | 'manual' | 'cancelled';
 
 /** Web Share → буфер обмена → ручное копирование. */
-export async function shareText(text: string, title = 'Мы на %'): Promise<ShareResult> {
+export async function shareText(text: string, title = APP_NAME): Promise<ShareResult> {
   if (typeof navigator !== 'undefined' && 'share' in navigator && window.isSecureContext) {
     try {
       await navigator.share({ title, text });

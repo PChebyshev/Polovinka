@@ -186,6 +186,21 @@ export function Stats() {
       </Card>
 
       <Card className="mt-3">
+        <Label>Установка на экран</Label>
+        <div className="mt-3">
+          <Funnel
+            steps={[
+              ['Увидели инструкцию', f.landingInstallShown],
+              ['Запустили с иконки', f.standaloneLaunch],
+            ]}
+          />
+        </div>
+        <p className="mt-3 text-xs text-muted">
+          Продолжили в браузере: {f.landingBrowser}. Перенесли вход в приложение кодом: {f.handoffRedeemed}.
+        </p>
+      </Card>
+
+      <Card className="mt-3">
         <Label>Итог недели</Label>
         <div className="mt-3">
           <Funnel

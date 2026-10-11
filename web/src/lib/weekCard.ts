@@ -49,7 +49,7 @@ export function drawWeekCard(canvas: HTMLCanvasElement, names: [string, string |
   ctx.fillStyle = '#b89f93';
   ctx.font = `600 34px ${font}`;
   ctx.textBaseline = 'top';
-  ctx.fillText('МЫ НА %  ·  ИТОГ НЕДЕЛИ', 80, 90);
+  ctx.fillText('ПОЛОВИНКА  ·  ИТОГ НЕДЕЛИ', 80, 90);
   ctx.fillText(`${fmtDate(st.weekStart)} — ${fmtDate(st.weekEnd)}`.toUpperCase(), 80, 136);
 
   const title = names[1] ? `${names[0]} и ${names[1]}` : names[0];
@@ -93,7 +93,7 @@ export function drawWeekCard(canvas: HTMLCanvasElement, names: [string, string |
   heart(ctx, 118, 1150, 70);
   ctx.fillStyle = '#f6ece4';
   ctx.font = `700 44px ${font}`;
-  ctx.fillText('Мы на %', 180, 1160);
+  ctx.fillText('Половинка', 180, 1160);
   ctx.fillStyle = '#b89f93';
   ctx.font = `500 34px ${font}`;
   ctx.fillText('один вопрос в день на двоих', 180, 1215);

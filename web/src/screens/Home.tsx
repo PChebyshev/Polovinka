@@ -112,7 +112,7 @@ export function Home() {
         <div>
           <div className="text-sm text-muted">{partner ? `${myName} и ${partner.name}` : myName}</div>
           <h1 className="text-2xl font-bold">
-            {pct === null ? 'Мы на %' : `Мы на ${pct}%`}
+            {pct === null ? 'Половинка' : `Совпадаем на ${pct}%`}
           </h1>
         </div>
         <div className="text-right text-xs text-muted">
@@ -125,6 +125,8 @@ export function Home() {
       {(offline || queuedNote) && <div className="mb-3 rounded-2xl bg-surface-2 px-4 py-2 text-center text-xs text-muted">Нет сети. Ответ сохранён на телефоне и отправится, когда она появится.</div>}
 
       <div className="space-y-4">
+        <InstallCard />
+
         {me.unseenGestures.map((g) => (
           <GestureCard key={g.id} gesture={g} fromName={partner?.name ?? 'половинка'} onSeen={() => seenGesture(g.id)} />
         ))}
@@ -174,8 +176,6 @@ export function Home() {
 
         {!today && !error && !me.pair.isGuest ? <Spinner /> : null}
         {today?.daily && renderRound(today.daily)}
-
-        {today?.daily?.status === 'revealed' && <InstallCard />}
 
         {today?.bonus.map((r) => renderRound(r))}
 

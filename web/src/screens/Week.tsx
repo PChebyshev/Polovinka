@@ -34,17 +34,17 @@ export function Week() {
   const url = `${location.origin}/w/${week.code}`;
   const title = week.names[1] ? `${week.names[0]} и ${week.names[1]}` : week.names[0];
   const d = week.stats.discoveries;
-  const text = `${title}: ${d} ${d % 10 === 1 && d % 100 !== 11 ? 'открытие' : d % 10 >= 2 && d % 10 <= 4 && (d % 100 < 10 || d % 100 >= 20) ? 'открытия' : 'открытий'} за неделю${week.stats.matchPercent ? `, совпали на ${week.stats.matchPercent}%` : ''}. Наш ритуал в «Мы на %»: ${url}`;
+  const text = `${title}: ${d} ${d % 10 === 1 && d % 100 !== 11 ? 'открытие' : d % 10 >= 2 && d % 10 <= 4 && (d % 100 < 10 || d % 100 >= 20) ? 'открытия' : 'открытий'} за неделю${week.stats.matchPercent ? `, совпали на ${week.stats.matchPercent}%` : ''}. Наш ритуал в Половинке: ${url}`;
 
   const share = async () => {
     const canvas = canvasRef.current!;
     setStatus('busy');
     try {
       const blob = await canvasToBlob(canvas);
-      const file = new File([blob], 'my-na-procent.png', { type: 'image/png' });
+      const file = new File([blob], 'polovinka-week.png', { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] }) && window.isSecureContext) {
         try {
-          await navigator.share({ files: [file], text, title: 'Мы на %' });
+          await navigator.share({ files: [file], text, title: 'Половинка' });
           setStatus('shared');
           void api.weekShared('share_image');
           return;
@@ -88,7 +88,7 @@ export function Week() {
       {status === 'shared' && <p className="mt-2 text-center text-sm text-sage">Отправлено</p>}
       {status === 'copied' && <p className="mt-2 text-center text-sm text-sage">Текст со ссылкой скопирован</p>}
       {downloadUrl && (
-        <a className="mt-3 block text-center text-sm text-accent underline" href={downloadUrl} download="my-na-procent.png">
+        <a className="mt-3 block text-center text-sm text-accent underline" href={downloadUrl} download="polovinka-week.png">
           Сохранить картинку
         </a>
       )}

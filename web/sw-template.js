@@ -1,4 +1,4 @@
-/* Service worker «Мы на %». Генерируется при сборке: список ассетов подставляется из dist. */
+/* Service worker «Половинки». Генерируется при сборке: список ассетов подставляется из dist. */
 const VERSION = '__VERSION__';
 const SHELL = '__ASSETS__';
 const SHELL_CACHE = `shell-${VERSION}`;
@@ -154,7 +154,7 @@ self.addEventListener('message', (event) => {
 // --- Push ---------------------------------------------------------------------
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Мы на %', body: 'Загляните в приложение.', url: '/', tag: 'polovinka' };
+  let data = { title: 'Половинка', body: 'Загляните в приложение.', url: '/', tag: 'polovinka' };
   try {
     data = { ...data, ...event.data.json() };
   } catch {

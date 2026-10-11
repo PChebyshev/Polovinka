@@ -1,71 +1,64 @@
 import { useEffect, useState } from 'react';
+import { APP_NAME, APP_NAME_ACC } from '@polovinka/shared';
 import { api } from '../lib/api';
-import { canPrompt, dismissInstall, installDismissed, isIos, isStandalone, onInstallChange, promptInstall } from '../lib/install';
+import { dismissInstall, installDismissed, onInstallChange, platform, shouldOfferInstall } from '../lib/install';
 import { Button, Card, Label } from './ui';
-import { LoginCodeBox } from './LoginCode';
+import { InstallGuide } from './InstallGuide';
 
-export function InstallCard() {
+/**
+ * Для тех, кто начал в браузере. На iPhone ведёт на /install с одноразовым кодом
+ * в адресе запуска: открытая с экрана иконка войдёт в этот же аккаунт сама.
+ */
+export function InstallCard({ force = false }: { force?: boolean }) {
   const [, bump] = useState(0);
-  const [hidden, setHidden] = useState(() => installDismissed() || isStandalone());
-  const [shownLogged, setShownLogged] = useState(false);
-
+  const [hidden, setHidden] = useState(() => !shouldOfferInstall() || (!force && installDismissed()));
+  const [busy, setBusy] = useState(false);
   useEffect(() => onInstallChange(() => bump((n) => n + 1)), []);
-
-  const ios = isIos();
-  const available = canPrompt() || ios;
   useEffect(() => {
-    if (!hidden && available && !shownLogged) {
-      setShownLogged(true);
-      void api.track('install_prompt_shown');
-    }
-  }, [hidden, available, shownLogged]);
+    if (!hidden) void api.track('install_prompt_shown');
+  }, [hidden]);
 
-  if (hidden || !available) return null;
+  if (hidden) return null;
+  const ios = platform() === 'ios';
 
-  const dismiss = () => {
-    dismissInstall();
-    void api.track('install_dismissed');
-    setHidden(true);
-  };
-  const install = async () => {
-    const r = await promptInstall();
-    if (r === 'accepted') {
-      void api.track('install_accepted');
-      setHidden(true);
+  const goIos = async () => {
+    setBusy(true);
+    try {
+      const r = await api.createHandoff();
+      // Полная загрузка страницы: сервер подставит в манифест адрес запуска с кодом.
+      window.location.assign(`/install?h=${encodeURIComponent(r.code)}`);
+    } catch {
+      setBusy(false);
     }
   };
 
   return (
     <Card tone="sage" className="rise">
       <Label>На экран «Домой»</Label>
+      <p className="mt-2 text-sm text-muted">
+        {APP_NAME} будет открываться одной иконкой, и придут уведомления: утром — вопрос, вечером — раскрытие.
+      </p>
       {ios ? (
-        <>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted">
-            <li>Нажмите «Поделиться» внизу Safari, затем «На экран „Домой“».</li>
-            <li>Откройте приложение с экрана и нажмите «У меня уже есть аккаунт».</li>
-            <li>Введите этот код, чтобы остаться в вашей паре:</li>
-          </ol>
-          <LoginCodeBox auto />
-          <p className="mt-2 text-xs text-muted">Уведомления на iPhone работают только в приложении с экрана «Домой».</p>
-        </>
-      ) : (
-        <p className="mt-2 text-sm text-muted">Добавьте «Мы на %» на экран: откроется как приложение, без адресной строки.</p>
-      )}
-      <div className="mt-3 flex gap-2">
-        <Button variant="ghost" onClick={dismiss}>
-          Не сейчас
+        <Button className="mt-3 w-full" onClick={goIos} disabled={busy}>
+          Установить на экран
         </Button>
-        {!ios && (
-          <Button className="flex-1" onClick={install}>
-            Добавить
-          </Button>
-        )}
-        {ios && (
-          <Button variant="secondary" className="flex-1" onClick={dismiss}>
-            Понятно
-          </Button>
-        )}
-      </div>
+      ) : (
+        <div className="mt-3">
+          <InstallGuide finalStep={`Откройте ${APP_NAME_ACC} с иконки — вы уже будете в своём аккаунте.`} />
+        </div>
+      )}
+      {!force && (
+        <button
+          className="mt-2 w-full py-1 text-center text-xs text-muted"
+          onClick={() => {
+            dismissInstall();
+            void api.track('install_dismissed');
+            setHidden(true);
+          }}
+        >
+          Не сейчас
+        </button>
+      )}
     </Card>
   );
 }

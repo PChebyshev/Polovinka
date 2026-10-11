@@ -14,6 +14,10 @@ export function Join() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    if (me && me.partner && me.inviteCode === code) {
+      nav('/', { replace: true });
+      return;
+    }
     api
       .inviteInfo(code)
       .then(setInfo)

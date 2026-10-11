@@ -183,7 +183,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     const user = req.user!;
     const pair = pairOf(user);
     const url = `${publicBase(req)}/j/${pair.invite_code}`;
-    const text = `${user.name} зовёт тебя в «Мы на %» — один вопрос в день на двоих, 20 секунд. Открой: ${url}`;
+    const text = `${user.name} зовёт тебя в Половинку — один вопрос в день на двоих, 20 секунд. Открой: ${url}`;
     return { code: pair.invite_code, url, text };
   });
 
@@ -201,7 +201,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     if (!pair) return reply.code(404).send({ error: 'invite_not_found' });
     const members = all<UserRow>('SELECT * FROM users WHERE pair_id = ?', pair.id);
     const viewer = userByToken(readToken(req));
-    logEvent('invite_opened', { pairId: pair.id, userId: viewer?.id ?? null });
+    if (!viewer || viewer.pair_id !== pair.id) logEvent('invite_opened', { pairId: pair.id, userId: viewer?.id ?? null });
     const inviter = members.find((m) => m.id !== viewer?.id) ?? members[0];
     return {
       inviterName: inviter?.name ?? null,
@@ -395,7 +395,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     const name = partner?.name ?? 'половинка';
     const text = partner
       ? `${name}, я уже ответил(а) на наш вопрос дня${qText ? ` — «${qText}»` : ''}. Твоя очередь, это 20 секунд: ${url}`
-      : `${user.name} зовёт тебя в «Мы на %». Я уже ответил(а) на первый вопрос${qText ? ` — «${qText}»` : ''}, посмотрим, совпадём ли: ${url}`;
+      : `${user.name} зовёт тебя в Половинку. Я уже ответил(а) на первый вопрос${qText ? ` — «${qText}»` : ''}, посмотрим, совпадём ли: ${url}`;
 
     if (!already) {
       run('INSERT INTO notification_log (user_id, date, kind, created_at) VALUES (?, ?, ?, ?)', user.id, date, 'nudge', nowIso());

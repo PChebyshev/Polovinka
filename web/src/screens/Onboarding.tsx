@@ -1,17 +1,67 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { APP_NAME, APP_NAME_ACC } from '@polovinka/shared';
 import { api, ApiError } from '../lib/api';
 import { useStore } from '../lib/store';
-import { Button, Heart } from '../components/ui';
-import { isIos, isStandalone } from '../lib/install';
+import { Button, Card, Heart, Label } from '../components/ui';
+import { InstallGuide } from '../components/InstallGuide';
+import { isStandalone, shouldOfferInstall } from '../lib/install';
 
-export function Onboarding({ joinCode, challengeCode, inviterName, intro, onDone }: { joinCode?: string; challengeCode?: string; inviterName?: string | null; intro?: string; onDone?: () => void }) {
+type Mode = 'install' | 'name' | 'code';
+
+let landingLogged = false;
+
+/**
+ * Первый экран (лендинг). На телефоне в браузере первым шагом — установка на экран «Домой»:
+ * так у iPhone не появляется второй аккаунт, а уведомления вообще возможны.
+ * В установленном приложении и на компьютере — сразу имя.
+ */
+export function Onboarding({
+  joinCode,
+  challengeCode,
+  inviterName,
+  intro,
+  onDone,
+  handoffFailed = false,
+}: {
+  joinCode?: string;
+  challengeCode?: string;
+  inviterName?: string | null;
+  intro?: string;
+  onDone?: () => void;
+  handoffFailed?: boolean;
+}) {
   const { login } = useStore();
+  const [mode, setMode] = useState<Mode>(handoffFailed ? 'code' : shouldOfferInstall() ? 'install' : 'name');
   const [name, setName] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const homeScreenIos = isIos() && isStandalone() && !joinCode && !challengeCode;
-  const [mode, setMode] = useState<'name' | 'code'>(homeScreenIos ? 'code' : 'name');
   const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(handoffFailed ? 'Автоматический вход не сработал. Введите код из Safari: Настройки → «Вход на другом устройстве».' : null);
+
+  useEffect(() => {
+    if (mode === 'install' && !landingLogged) {
+      landingLogged = true;
+      void fetch('/api/events/anon', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'landing_install_shown' }) }).catch(() => undefined);
+    }
+  }, [mode]);
+
+  const submitName = async (e: FormEvent) => {
+    e.preventDefault();
+    const n = name.trim();
+    if (!n) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.createUser(n, joinCode, challengeCode);
+      login(r.token, r.me);
+      onDone?.();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'pair_full') setError('В этой паре уже двое. Попроси новую ссылку.');
+      else if (err instanceof ApiError && (err.code === 'invite_not_found' || err.code === 'not_found')) setError('Ссылка устарела или неверная.');
+      else setError('Не получилось. Проверь связь и попробуй ещё раз.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submitCode = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,56 +75,88 @@ export function Onboarding({ joinCode, challengeCode, inviterName, intro, onDone
       onDone?.();
     } catch (err) {
       if (err instanceof ApiError && err.code === 'too_many_attempts') setError('Слишком много попыток. Подождите 10 минут.');
-      else if (err instanceof ApiError && err.status === 404) setError('Код не подошёл или устарел. Возьмите новый в Safari.');
+      else if (err instanceof ApiError && err.status === 404) setError('Код не подошёл или устарел. Возьмите новый.');
       else setError('Не получилось. Проверьте связь и попробуйте ещё раз.');
     } finally {
       setBusy(false);
     }
   };
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    const n = name.trim();
-    if (!n) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await api.createUser(n, joinCode, challengeCode);
-      login(r.token, r.me);
-      onDone?.();
-    } catch (err) {
-      if (err instanceof ApiError && err.code === 'pair_full') setError('В этой паре уже двое. Попроси новую ссылку.');
-      else if (err instanceof ApiError && err.code === 'invite_not_found') setError('Ссылка устарела или неверная.');
-      else setError('Не получилось. Проверь связь и попробуй ещё раз.');
-    } finally {
-      setBusy(false);
-    }
-  };
+  const lead = intro ? (
+    intro
+  ) : inviterName ? (
+    <>
+      <span className="text-text">{inviterName}</span> зовёт тебя. Один вопрос в день на двоих: 20 секунд утром и маленькое открытие вечером.
+    </>
+  ) : (
+    'Один вопрос в день на двоих. 20 секунд утром, маленькое открытие вечером — и вы узнаёте друг друга чуть лучше.'
+  );
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
       <div className="rise text-accent">
         <Heart className="h-14 w-14" />
       </div>
-      <h1 className="rise mt-5 text-4xl font-bold leading-tight">Мы на %</h1>
-      <p className="rise-2 mt-3 text-lg text-muted">
-        {intro ? (
-          intro
-        ) : inviterName ? (
-          <>
-            <span className="text-text">{inviterName}</span> зовёт тебя. Один вопрос в день на двоих, 20 секунд, и маленькое открытие вечером.
-          </>
-        ) : (
-          'Один вопрос в день на двоих. 20 секунд утром, маленькое открытие вечером.'
-        )}
-      </p>
-      {mode === 'code' ? (
+      <h1 className="rise mt-5 text-4xl font-bold leading-tight">{APP_NAME}</h1>
+      <p className="rise-2 mt-3 text-lg text-muted">{lead}</p>
+
+      {mode === 'install' && (
+        <div className="rise-3 mt-8">
+          <Card tone="accent">
+            <Label>Шаг 1 из 2 · 10 секунд</Label>
+            <h2 className="mt-2 text-xl font-semibold">Добавьте {APP_NAME_ACC} на экран «Домой»</h2>
+            <p className="mt-1 text-sm text-muted">Одна иконка, без App Store. Только так придут уведомления: утром — вопрос, вечером — раскрытие.</p>
+            <div className="mt-4">
+              <InstallGuide finalStep={`Откройте ${APP_NAME_ACC} с иконки — там введёте имя${inviterName ? ' и окажетесь в паре' : ''}.`} />
+            </div>
+          </Card>
+          <button
+            className="mt-5 w-full py-2 text-center text-sm text-muted underline decoration-dotted"
+            onClick={() => {
+              void fetch('/api/events/anon', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'landing_browser' }) }).catch(() => undefined);
+              setMode('name');
+            }}
+          >
+            Продолжить в браузере
+          </button>
+        </div>
+      )}
+
+      {mode === 'name' && (
+        <form onSubmit={submitName} className="rise-3 mt-8 space-y-4">
+          <label className="block">
+            <span className="text-sm text-muted">Как тебя зовут?</span>
+            <input
+              className="mt-2 w-full rounded-2xl border border-line bg-surface px-5 py-4 text-xl outline-none focus:border-accent/60"
+              placeholder="Имя"
+              autoFocus
+              autoComplete="given-name"
+              maxLength={24}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          {error && <p className="text-sm text-rose">{error}</p>}
+          <Button type="submit" big className="w-full" disabled={busy || !name.trim()}>
+            {challengeCode ? 'Принять вызов' : inviterName ? 'Присоединиться' : 'Начать'}
+          </Button>
+          <p className="text-center text-xs text-muted">Без регистрации, почты и SMS. Ответы видны только вам двоим.</p>
+          {!joinCode && !challengeCode && (
+            <button type="button" className="w-full text-center text-sm text-muted underline decoration-dotted" onClick={() => setMode('code')}>
+              {isStandalone() ? 'Я уже начал(а) в Safari или на другом телефоне' : 'У меня уже есть аккаунт'}
+            </button>
+          )}
+          {shouldOfferInstall() && (
+            <button type="button" className="w-full text-center text-sm text-muted underline decoration-dotted" onClick={() => setMode('install')}>
+              Как установить на экран
+            </button>
+          )}
+        </form>
+      )}
+
+      {mode === 'code' && (
         <form onSubmit={submitCode} className="rise-3 mt-8 space-y-4">
-          <p className="text-sm text-muted">
-            {homeScreenIos
-              ? 'Уже начали в Safari? Приложение на экране «Домой» не видит вход из Safari. Откройте сайт в Safari → Настройки → «Вход на другом устройстве» и введите код здесь.'
-              : 'На устройстве, где вы уже вошли: Настройки → «Вход на другом устройстве». Введите код здесь.'}
-          </p>
+          <p className="text-sm text-muted">Там, где вы уже вошли: Настройки → «Вход на другом устройстве» → «Показать код». Введите его здесь.</p>
           <input
             className="w-full rounded-2xl border border-line bg-surface px-5 py-4 text-center font-mono text-2xl uppercase tracking-[0.3em] outline-none focus:border-accent/60"
             placeholder="КОД"
@@ -95,31 +177,6 @@ export function Onboarding({ joinCode, challengeCode, inviterName, intro, onDone
             Я здесь впервые
           </button>
         </form>
-      ) : (
-      <form onSubmit={submit} className="rise-3 mt-8 space-y-4">
-        <label className="block">
-          <span className="text-sm text-muted">Как тебя зовут?</span>
-          <input
-            className="mt-2 w-full rounded-2xl border border-line bg-surface px-5 py-4 text-xl outline-none focus:border-accent/60"
-            placeholder="Имя"
-            autoFocus
-            autoComplete="given-name"
-            maxLength={24}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        {error && <p className="text-sm text-rose">{error}</p>}
-        <Button type="submit" big className="w-full" disabled={busy || !name.trim()}>
-          {challengeCode ? 'Принять вызов' : inviterName ? 'Присоединиться' : 'Поехали'}
-        </Button>
-        <p className="text-center text-xs text-muted">Без регистрации, почты и SMS. Ответы видны только вам двоим.</p>
-        {!joinCode && !challengeCode && (
-          <button type="button" className="w-full text-center text-sm text-muted underline decoration-dotted" onClick={() => setMode('code')}>
-            У меня уже есть аккаунт
-          </button>
-        )}
-      </form>
       )}
     </div>
   );

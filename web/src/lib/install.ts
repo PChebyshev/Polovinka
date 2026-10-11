@@ -1,4 +1,4 @@
-/** Подсказка «Добавить на экран»: ловим beforeinstallprompt, на iOS показываем инструкцию. */
+/** Установка на экран «Домой»: beforeinstallprompt на Android, инструкция на iOS. */
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -35,7 +35,37 @@ export function isStandalone(): boolean {
 }
 
 export function isIos(): boolean {
-  return /iPhone|iPad|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream;
+  const ua = navigator.userAgent;
+  // iPadOS 13+ представляется Mac'ом, но с тачем.
+  return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+export function isAndroid(): boolean {
+  return /Android/.test(navigator.userAgent);
+}
+
+export type Platform = 'ios' | 'android' | 'desktop';
+export function platform(): Platform {
+  if (isIos()) return 'ios';
+  if (isAndroid()) return 'android';
+  return 'desktop';
+}
+
+/** Встроенные браузеры мессенджеров не умеют «На экран „Домой“». */
+export function inAppBrowser(): string | null {
+  const ua = navigator.userAgent;
+  if (/Telegram/i.test(ua)) return 'Telegram';
+  if (/WhatsApp/i.test(ua)) return 'WhatsApp';
+  if (/Instagram/i.test(ua)) return 'Instagram';
+  if (/FBAN|FBAV/i.test(ua)) return 'Facebook';
+  if (/VKClient|vkontakte/i.test(ua)) return 'VK';
+  if (/YaBrowser|YaApp|YandexSearch/i.test(ua) && isIos()) return null;
+  return null;
+}
+
+/** Нужна ли вообще инструкция по установке на этом устройстве. */
+export function shouldOfferInstall(): boolean {
+  return !isStandalone() && platform() !== 'desktop';
 }
 
 export function canPrompt(): boolean {
@@ -53,7 +83,10 @@ export async function promptInstall(): Promise<'accepted' | 'dismissed' | 'unava
 
 export function installDismissed(): boolean {
   try {
-    return localStorage.getItem('polovinka.install.dismissed') === '1' || localStorage.getItem('polovinka.installed') === '1';
+    if (localStorage.getItem('polovinka.installed') === '1') return true;
+    const t = Number(localStorage.getItem('polovinka.install.dismissedAt') ?? 0);
+    // Отказ помним три дня, потом мягко предлагаем ещё раз.
+    return Date.now() - t < 3 * 86_400_000;
   } catch {
     return false;
   }
@@ -61,8 +94,26 @@ export function installDismissed(): boolean {
 
 export function dismissInstall() {
   try {
-    localStorage.setItem('polovinka.install.dismissed', '1');
+    localStorage.setItem('polovinka.install.dismissedAt', String(Date.now()));
   } catch {
     /* пусто */
   }
+}
+
+/** Адрес запуска установленного приложения — как на сервере (startUrlFor). */
+export function startUrlFor(pathname: string, search: string): string {
+  const m = pathname.match(/^\/(j|c)\/([a-z0-9]{4,16})$/);
+  if (m) return `/${m[1]}/${m[2]}`;
+  const h = new URLSearchParams(search).get('h');
+  if (pathname === '/install' && h && /^[A-Z0-9]{16}$/.test(h)) return `/?h=${h}`;
+  return '/';
+}
+
+/** При переходах внутри SPA держим ссылку на манифест в соответствии с текущей страницей. */
+export function syncManifest(pathname: string, search: string) {
+  if (isStandalone()) return;
+  const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+  if (!link) return;
+  const href = `/api/manifest.webmanifest?start=${encodeURIComponent(startUrlFor(pathname, search))}`;
+  if (link.getAttribute('href') !== href) link.setAttribute('href', href);
 }

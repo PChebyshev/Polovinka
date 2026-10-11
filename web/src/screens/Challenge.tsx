@@ -118,7 +118,7 @@ export function Challenge() {
   };
 
   const share = async () => {
-    const text = `${names(cmp.myPairNames)} бросают вам вызов в «Мы на %»: пройдите те же 5 вопросов, а потом сравним, где совпали. Без победителей, только открытия: ${location.origin}/c/${code}`;
+    const text = `${names(cmp.myPairNames)} бросают вам вызов в Половинке: пройдите те же 5 вопросов, а потом сравним, где совпали. Без победителей, только открытия: ${location.origin}/c/${code}`;
     const r = await shareText(text);
     setShareState(r);
   };

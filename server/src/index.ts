@@ -33,6 +33,44 @@ initPush(DATA_DIR, app.log);
 startScheduler();
 await registerRoutes(app, { dataDir: DATA_DIR });
 
+/**
+ * Адрес, с которого стартует установленное приложение. На iOS у приложения на экране
+ * «Домой» своё хранилище, поэтому ссылка-приглашение (/j/…), вызов (/c/…) или
+ * одноразовый код входа (/?h=…) должны попасть в него через start_url.
+ */
+function startUrlFor(path: string, query: URLSearchParams): string {
+  const m = path.match(/^\/(j|c)\/([a-z0-9]{4,16})$/);
+  if (m) return `/${m[1]}/${m[2]}`;
+  const h = query.get('h');
+  if (path === '/install' && h && /^[A-Z0-9]{16}$/.test(h)) return `/?h=${h}`;
+  return '/';
+}
+
+app.get('/api/manifest.webmanifest', async (req, reply) => {
+  const raw = String((req.query as { start?: string }).start ?? '/');
+  const [p, q] = raw.split('?');
+  const start = startUrlFor(p === '/' && q ? '/install' : p, new URLSearchParams(q ?? ''));
+  reply.header('Cache-Control', 'no-cache').type('application/manifest+json; charset=utf-8');
+  return {
+    id: '/',
+    name: 'Половинка — один вопрос в день на двоих',
+    short_name: 'Половинка',
+    description: 'Один вопрос в день на двоих. 20 секунд утром, маленькое открытие вечером.',
+    lang: 'ru',
+    start_url: start,
+    scope: '/',
+    display: 'standalone',
+    orientation: 'portrait',
+    background_color: '#1b1412',
+    theme_color: '#1b1412',
+    icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  };
+});
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
@@ -45,7 +83,7 @@ interface Og {
 
 function ogFor(path: string, base: string): Og {
   const def: Og = {
-    title: 'Мы на % — ежедневный ритуал для пары',
+    title: 'Половинка — один вопрос в день на двоих',
     description: 'Один вопрос в день на двоих. 20 секунд утром, маленькое открытие вечером.',
     image: `${base}/og-default.png`,
   };
@@ -72,7 +110,7 @@ function ogFor(path: string, base: string): Og {
       const pct = st.matchPercent === null ? '' : `, совпали на ${st.matchPercent}%`;
       return {
         title: `${title}: ${st.discoveries} ${plural(st.discoveries, 'открытие', 'открытия', 'открытий')} за неделю${pct}`,
-        description: 'Один вопрос в день на двоих. Попробуйте свой ритуал в «Мы на %».',
+        description: 'Один вопрос в день на двоих. Попробуйте свой ритуал в Половинке.',
         image: card.png_path && existsSync(card.png_path) ? `${base}/api/week/${w[1]}/image.png` : def.image,
       };
     }
@@ -83,7 +121,7 @@ function ogFor(path: string, base: string): Og {
     const inviter = pair ? one<UserRow>('SELECT * FROM users WHERE pair_id = ? ORDER BY created_at LIMIT 1', pair.id) : undefined;
     if (inviter) {
       return {
-        title: `${inviter.name} зовёт тебя в «Мы на %»`,
+        title: `${inviter.name} зовёт тебя в Половинку`,
         description: 'Один вопрос в день на двоих. Ответь, и узнаем, совпадёте ли вы.',
         image: def.image,
       };
@@ -127,7 +165,12 @@ if (WEB_DIST) {
       `<meta name="twitter:card" content="summary_large_image">`,
       `<meta name="description" content="${escapeHtml(og.description)}">`,
     ].join('\n    ');
-    const html = indexHtml.replace('<!--og-->', tags).replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(og.title)}</title>`);
+    const [pathOnly, queryOnly] = req.url.split('?');
+    const start = startUrlFor(pathOnly, new URLSearchParams(queryOnly ?? ''));
+    const html = indexHtml
+      .replace('<!--og-->', tags)
+      .replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(og.title)}</title>`)
+      .replace('href="/api/manifest.webmanifest"', `href="/api/manifest.webmanifest?start=${encodeURIComponent(start)}"`);
     reply.header('Cache-Control', 'no-cache').type('text/html; charset=utf-8').send(html);
   });
 } else {

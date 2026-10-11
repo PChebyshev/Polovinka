@@ -1,5 +1,5 @@
-import type { ReactElement } from 'react';
-import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from './lib/store';
 import { Onboarding } from './screens/Onboarding';
 import { Home } from './screens/Home';
@@ -12,6 +12,9 @@ import { WeekPublicScreen } from './screens/WeekPublic';
 import { Challenge } from './screens/Challenge';
 import { NewChallenge } from './screens/NewChallenge';
 import { Stats } from './screens/Stats';
+import { Install } from './screens/Install';
+import { isStandalone, syncManifest } from './lib/install';
+import { getToken } from './lib/api';
 import { CelebrationOverlay } from './components/Celebration';
 import { Spinner, Heart } from './components/ui';
 import { GestureCard } from './components/GestureToast';
@@ -94,10 +97,67 @@ function Celebrations() {
   return <CelebrationOverlay c={c} pairTitle={me.partner ? `${me.user.name} и ${me.partner.name}` : me.user.name} onClose={close} />;
 }
 
+/** Одноразовый код из адреса запуска (/?h=…): вход в установленное приложение без ввода. */
+function useHandoff(): { pending: boolean; failed: boolean } {
+  const { login } = useStore();
+  const [state, setState] = useState(() => {
+    const h = new URLSearchParams(location.search).get('h');
+    return { pending: !!h && /^[A-Z0-9]{16}$/.test(h) && !getToken(), failed: false };
+  });
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const h = params.get('h');
+    if (!h) return;
+    const clean = () => history.replaceState(null, '', location.pathname === '/install' ? '/' : location.pathname);
+    if (getToken() || !/^[A-Z0-9]{16}$/.test(h)) {
+      clean();
+      return;
+    }
+    api
+      .redeemLoginCode(h)
+      .then((r) => {
+        login(r.token, r.me);
+        clean();
+        setState({ pending: false, failed: false });
+      })
+      .catch(() => {
+        clean();
+        setState({ pending: false, failed: true });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return state;
+}
+
 function Shell() {
   const { ready, me } = useStore();
   const loc = useLocation();
-  if (!ready) return <Spinner />;
+  const nav = useNavigate();
+  const handoff = useHandoff();
+  const launched = useRef(false);
+
+  useEffect(() => {
+    syncManifest(loc.pathname, loc.search);
+  }, [loc.pathname, loc.search]);
+
+  // Запуск с иконки: приложение могло стартовать со ссылки-приглашения, после входа — на главную.
+  useEffect(() => {
+    if (!me || launched.current) return;
+    launched.current = true;
+    if (!isStandalone()) return;
+    try {
+      if (!localStorage.getItem('polovinka.standaloneLogged')) {
+        localStorage.setItem('polovinka.standaloneLogged', '1');
+        void api.track('standalone_launch');
+      }
+    } catch {
+      /* пусто */
+    }
+    if ((loc.pathname.startsWith('/j/') && me.partner) || (loc.pathname.startsWith('/c/') && !me.pair.isGuest)) nav('/', { replace: true });
+  }, [me, loc.pathname, nav]);
+
+  if (!ready || handoff.pending) return <Spinner />;
+  if (!me && handoff.failed) return <Onboarding handoffFailed />;
   const publicPath = ['/j/', '/w/', '/c/', '/stats'].some((p) => loc.pathname.startsWith(p));
   if (!me && !publicPath) return <Onboarding />;
   return (
@@ -112,6 +172,7 @@ function Shell() {
         <Route path="/c/:code" element={<Challenge />} />
         <Route path="/challenge" element={<NewChallenge />} />
         <Route path="/stats" element={<Stats />} />
+        <Route path="/install" element={<Install />} />
         <Route path="/j/:code" element={<Join />} />
         <Route path="*" element={<Home />} />
       </Routes>

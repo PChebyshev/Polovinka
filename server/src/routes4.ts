@@ -19,10 +19,12 @@ function keyOk(given: unknown): boolean {
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const CODE_LEN = 6;
 const CODE_TTL_MIN = 30;
+const HANDOFF_LEN = 16;
+const HANDOFF_TTL_DAYS = 7;
 
-function newLoginCode(): string {
+function newLoginCode(len = CODE_LEN): string {
   let s = '';
-  for (let i = 0; i < CODE_LEN; i++) s += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  for (let i = 0; i < len; i++) s += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
   return s;
 }
 
@@ -39,10 +41,23 @@ function tooManyAttempts(ip: string): boolean {
 export async function registerStage4Routes(app: FastifyInstance, deps: { meResponse: (u: UserRow) => unknown }) {
   // --- Перенос входа на другое устройство ---------------------------------------
 
+  /** Длинный код для автоматического входа в приложение на экране «Домой» (через start_url). */
+  app.post('/api/login-codes/handoff', { preHandler: requireUser }, async (req) => {
+    const user = req.user!;
+    const ts = nowIso();
+    run('DELETE FROM login_codes WHERE expires_at < ?', ts);
+    run('DELETE FROM login_codes WHERE user_id = ? AND length(code) = ? AND used_at IS NULL', user.id, HANDOFF_LEN);
+    const code = newLoginCode(HANDOFF_LEN);
+    const expires = new Date(Date.now() + HANDOFF_TTL_DAYS * 86_400_000).toISOString();
+    run('INSERT INTO login_codes (code, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)', code, user.id, expires, ts);
+    return { code, expiresAt: expires };
+  });
+
   app.post('/api/login-codes', { preHandler: requireUser }, async (req) => {
     const user = req.user!;
     const ts = nowIso();
-    run('DELETE FROM login_codes WHERE user_id = ? OR expires_at < ?', user.id, ts);
+    run('DELETE FROM login_codes WHERE expires_at < ?', ts);
+    run('DELETE FROM login_codes WHERE user_id = ? AND length(code) = ?', user.id, CODE_LEN);
     let code = newLoginCode();
     while (one('SELECT 1 FROM login_codes WHERE code = ?', code)) code = newLoginCode();
     const expires = new Date(Date.now() + CODE_TTL_MIN * 60_000).toISOString();
@@ -55,7 +70,7 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
     if (tooManyAttempts(req.ip)) return reply.code(429).send({ error: 'too_many_attempts' });
     const raw = ((req.body ?? {}) as { code?: unknown }).code;
     const code = typeof raw === 'string' ? raw.toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
-    if (code.length !== CODE_LEN) return reply.code(400).send({ error: 'code' });
+    if (code.length !== CODE_LEN && code.length !== HANDOFF_LEN) return reply.code(400).send({ error: 'code' });
     const row = one<{ user_id: string; expires_at: string; used_at: string | null }>('SELECT * FROM login_codes WHERE code = ?', code);
     if (!row || row.used_at || row.expires_at < nowIso()) return reply.code(404).send({ error: 'code_invalid' });
     const user = one<UserRow>('SELECT * FROM users WHERE id = ?', row.user_id);
@@ -63,7 +78,7 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
     const token = newToken();
     run('UPDATE login_codes SET used_at = ? WHERE code = ?', nowIso(), code);
     run('INSERT INTO user_tokens (token_hash, user_id, created_at) VALUES (?, ?, ?)', hashToken(token), user.id, nowIso());
-    logEvent('login_code_redeemed', { pairId: user.pair_id, userId: user.id });
+    logEvent(code.length === HANDOFF_LEN ? 'handoff_redeemed' : 'login_code_redeemed', { pairId: user.pair_id, userId: user.id });
     return { token, me: deps.meResponse(user) };
   });
 
@@ -115,9 +130,26 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
   app.post('/api/events', { preHandler: requireUser }, async (req, reply) => {
     const user = req.user!;
     const body = (req.body ?? {}) as { type?: unknown };
-    const allowed = new Set(['install_prompt_shown', 'install_accepted', 'install_dismissed', 'offline_queued', 'offline_flushed']);
+    const allowed = new Set([
+      'install_prompt_shown',
+      'install_accepted',
+      'install_dismissed',
+      'offline_queued',
+      'offline_flushed',
+      'landing_browser',
+      'standalone_launch',
+    ]);
     if (typeof body.type !== 'string' || !allowed.has(body.type)) return reply.code(400).send({ error: 'type' });
     logEvent(body.type, { pairId: user.pair_id, userId: user.id });
+    return { ok: true };
+  });
+
+  /** Анонимные события лендинга: пользователя ещё нет. */
+  app.post('/api/events/anon', async (req, reply) => {
+    const type = ((req.body ?? {}) as { type?: unknown }).type;
+    const allowed = new Set(['landing_install_shown', 'landing_browser']);
+    if (typeof type !== 'string' || !allowed.has(type)) return reply.code(400).send({ error: 'type' });
+    logEvent(type, {});
     return { ok: true };
   });
 

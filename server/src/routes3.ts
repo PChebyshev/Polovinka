@@ -285,7 +285,7 @@ export async function registerStage3Routes(app: FastifyInstance, deps: Deps) {
     return {
       code,
       url: `${base}/c/${code}`,
-      text: `${title} бросают вам вызов в «Мы на %»: пройдите те же 5 вопросов, а потом сравним, где совпали. Без победителей, только открытия: ${base}/c/${code}`,
+      text: `${title} бросают вам вызов в Половинке: пройдите те же 5 вопросов, а потом сравним, где совпали. Без победителей, только открытия: ${base}/c/${code}`,
       compare: compareChallenge(challengeByCode(code)!, user),
     };
   });

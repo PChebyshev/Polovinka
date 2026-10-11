@@ -21,6 +21,10 @@ export interface StatsResponse {
     challengesConverted: number;
     weeklyShared: number;
     weeklyOpened: number;
+    landingInstallShown: number;
+    landingBrowser: number;
+    standaloneLaunch: number;
+    handoffRedeemed: number;
   };
   kFactor: {
     sharesPerUser: number;
@@ -61,6 +65,10 @@ export function computeStats(periodDays = 30): StatsResponse {
     challengesConverted: count('challenge_converted', since),
     weeklyShared: count('weekly_shared', since),
     weeklyOpened: count('weekly_opened', since),
+    landingInstallShown: count('landing_install_shown', since),
+    landingBrowser: count('landing_browser', since),
+    standaloneLaunch: count('standalone_launch', since),
+    handoffRedeemed: count('handoff_redeemed', since) + count('login_code_redeemed', since),
   };
 
   const usersInPeriod = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', since)?.n ?? 0) || users;

@@ -107,7 +107,7 @@ export async function sendTestPush(user: UserRow): Promise<{ sent: number; faile
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        JSON.stringify({ title: 'Мы на %', body: 'Уведомления работают. Утром — вопрос, вечером — раскрытие.', url: '/settings', tag: 'test' }),
+        JSON.stringify({ title: 'Половинка', body: 'Уведомления работают. Утром — вопрос, вечером — раскрытие.', url: '/settings', tag: 'test' }),
         { TTL: 600, urgency: 'high' },
       );
       if (s.failed_at) run('UPDATE push_subscriptions SET failed_at = NULL WHERE id = ?', s.id);

@@ -133,6 +133,7 @@ export const api = {
   pushSubscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/api/push/subscribe', sub),
   pushUnsubscribe: (endpoint?: string) => request<{ ok: true }>('DELETE', '/api/push/subscribe', endpoint ? { endpoint } : {}),
   pushStatus: () => request<{ subscribed: boolean; endpoints: string[] }>('GET', '/api/push/status'),
+  createHandoff: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes/handoff'),
   createLoginCode: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes'),
   redeemLoginCode: (code: string) => request<{ token: string; me: MeResponse }>('POST', '/api/login-codes/redeem', { code }),
   pushTest: () => request<{ sent: number; failed: number; statuses: number[]; tooSoon?: boolean; disabled?: boolean }>('POST', '/api/push/test'),
@@ -157,6 +158,10 @@ export interface StatsResponse {
     challengesConverted: number;
     weeklyShared: number;
     weeklyOpened: number;
+    landingInstallShown: number;
+    landingBrowser: number;
+    standaloneLaunch: number;
+    handoffRedeemed: number;
   };
   kFactor: { sharesPerUser: number; conversion: number; k: number };
   closeness: { daysBothShare: number | null; revealsWithWhyShare: number | null; gesturesPerPairWeek: number | null; activePairs: number };
