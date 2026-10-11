@@ -31,6 +31,8 @@ npm run dev
 
 ## Боевой запуск (VPS, HTTPS)
 
+Пошагово для Timeweb Cloud: [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ```bash
 export DOMAIN=example.ru
 docker compose up -d --build

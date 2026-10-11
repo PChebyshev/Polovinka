@@ -1,7 +1,8 @@
 # Боевой запуск на VPS: приложение + Caddy с автоматическим TLS.
 # 1. Направьте A-запись домена на сервер.
-# 2. Укажите домен: export DOMAIN=example.ru
+# 2. cp .env.example .env и заполните DOMAIN, STATS_KEY, VAPID_EMAIL
 # 3. docker compose up -d --build
+# Подробно: docs/DEPLOY.md
 services:
   app:
     build: .
@@ -10,6 +11,8 @@ services:
       PUBLIC_URL: https://${DOMAIN:-localhost}
       STATS_KEY: ${STATS_KEY:-}
       VAPID_SUBJECT: mailto:${VAPID_EMAIL:-hello@example.com}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
     volumes:
       - app-data:/data
     expose:
