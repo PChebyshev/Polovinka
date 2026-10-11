@@ -1,3 +1,4 @@
+import { enqueue } from './queue';
 import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
@@ -25,12 +26,33 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Ошибка сети при запросе, который поставлен в офлайн-очередь. */
+export class QueuedError extends Error {
+  constructor() {
+    super('queued');
+  }
+}
+
+/** Последний GET-ответ пришёл из кэша service worker'а (нет сети). */
+export let lastFromCache = false;
+
+async function request<T>(method: string, path: string, body?: unknown, opts: { queue?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.authorization = `Bearer ${token}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
-  const res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  let res: Response;
+  try {
+    res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch (e) {
+    if (opts.queue && body !== undefined) {
+      await enqueue({ method: method as 'POST', path, body: JSON.stringify(body) });
+      void track('offline_queued');
+      throw new QueuedError();
+    }
+    throw e;
+  }
+  lastFromCache = res.headers.get('x-sw-cache') === '1';
   if (!res.ok) {
     let code = `http_${res.status}`;
     try {
@@ -69,13 +91,13 @@ export const api = {
   today: () => request<TodayResponse>('GET', '/api/today'),
   round: (id: string) => request<RoundPublic>('GET', `/api/rounds/${id}`),
   answer: (roundId: string, choice: string, guess: string | null, cid: string) =>
-    request<RoundPublic>('POST', `/api/rounds/${roundId}/answer`, { choice, guess, clientId: cid }),
-  why: (roundId: string, data: { whyText?: string; whyChip?: string }) => request<RoundPublic>('POST', `/api/rounds/${roundId}/why`, data),
+    request<RoundPublic>('POST', `/api/rounds/${roundId}/answer`, { choice, guess, clientId: cid }, { queue: true }),
+  why: (roundId: string, data: { whyText?: string; whyChip?: string }) => request<RoundPublic>('POST', `/api/rounds/${roundId}/why`, data, { queue: true }),
   topicOpened: (roundId: string) => request<{ ok: true }>('POST', `/api/rounds/${roundId}/topic-opened`),
   bonus: () => request<RoundPublic>('POST', '/api/rounds/bonus'),
   mark: (questionId: string) => request<{ ok: true }>('POST', `/api/questions/${questionId}/mark`),
   nudge: () => request<{ text: string; url: string; firstToday: boolean }>('POST', '/api/nudge'),
-  sendGesture: (type: string, text: string, cid: string) => request<GesturePublic>('POST', '/api/gestures', { type, text, clientId: cid }),
+  sendGesture: (type: string, text: string, cid: string) => request<GesturePublic>('POST', '/api/gestures', { type, text, clientId: cid }, { queue: true }),
   gestures: () => request<{ gestures: GesturePublic[] }>('GET', '/api/gestures'),
   gestureSeen: (id: string) => request<{ ok: true }>('POST', `/api/gestures/${id}/seen`),
   deleteHistory: () => request<{ ok: true }>('DELETE', '/api/pair/history'),
@@ -105,4 +127,35 @@ export const api = {
   joinChallenge: (code: string) => request<ChallengeCompare>('POST', `/api/challenges/${encodeURIComponent(code)}/join`),
   challengeCompare: (code: string) => request<ChallengeCompare>('GET', `/api/challenges/${encodeURIComponent(code)}/compare`),
   convertPair: () => request<MeResponse>('POST', '/api/pair/convert'),
+  // Этап 4
+  track: (type: string) => track(type),
+  pushKey: () => request<{ enabled: boolean; key: string }>('GET', '/api/push/key'),
+  pushSubscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/api/push/subscribe', sub),
+  pushUnsubscribe: (endpoint?: string) => request<{ ok: true }>('DELETE', '/api/push/subscribe', endpoint ? { endpoint } : {}),
+  pushStatus: () => request<{ subscribed: boolean; endpoints: string[] }>('GET', '/api/push/status'),
+  stats: (key: string, days: number) => request<StatsResponse>('GET', `/api/stats?key=${encodeURIComponent(key)}&days=${days}`),
 };
+
+function track(type: string): Promise<unknown> {
+  return request('POST', '/api/events', { type }).catch(() => undefined);
+}
+
+export interface StatsResponse {
+  generatedAt: string;
+  periodDays: number;
+  totals: { users: number; pairsComplete: number; pairsGuest: number; pairsSolo: number; pushSubscribed: number };
+  funnel: {
+    invitesSent: number;
+    invitesOpened: number;
+    invitesAccepted: number;
+    challengesSent: number;
+    challengesOpened: number;
+    challengePairsCreated: number;
+    challengesConverted: number;
+    weeklyShared: number;
+    weeklyOpened: number;
+  };
+  kFactor: { sharesPerUser: number; conversion: number; k: number };
+  closeness: { daysBothShare: number | null; revealsWithWhyShare: number | null; gesturesPerPairWeek: number | null; activePairs: number };
+  daily: Array<{ date: string; answers: number; reveals: number; gestures: number; users: number }>;
+}

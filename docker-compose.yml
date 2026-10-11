@@ -9,6 +9,7 @@ services:
     environment:
       PUBLIC_URL: https://${DOMAIN:-localhost}
       STATS_KEY: ${STATS_KEY:-}
+      VAPID_SUBJECT: mailto:${VAPID_EMAIL:-hello@example.com}
     volumes:
       - app-data:/data
     expose:

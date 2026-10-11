@@ -13,6 +13,7 @@ function plural(n: number, one: string, few: string, many: string): string {
   return many;
 }
 import { registerRoutes } from './routes.js';
+import { initPush, startScheduler } from './push.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8787);
@@ -28,6 +29,8 @@ openDb(DATA_DIR);
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: true });
 
+initPush(DATA_DIR, app.log);
+startScheduler();
 await registerRoutes(app, { dataDir: DATA_DIR });
 
 function escapeHtml(s: string): string {

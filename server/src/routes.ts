@@ -11,6 +11,8 @@ import { addClient, sendTo } from './sse.js';
 import { checkMilestones, unseenCelebrations } from './levels.js';
 import { registerStage2Routes, gestureTemplatesOf } from './routes2.js';
 import { registerStage3Routes, joinChallenge, challengeOfRound, notifyChallenge, myChallenges } from './routes3.js';
+import { registerStage4Routes } from './routes4.js';
+import { pushReveal } from './push.js';
 
 const MAX_BONUS_PER_DAY = 3;
 const NAME_MAX = 24;
@@ -157,6 +159,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
 
   await registerStage2Routes(app, { meResponse });
   await registerStage3Routes(app, { meResponse, dataDir: opts.dataDir });
+  await registerStage4Routes(app);
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };
@@ -332,6 +335,10 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
       sendTo(partner?.id, { type: 'revealed', roundId: round.id });
       const ch = challengeOfRound(round);
       if (ch) notifyChallenge(ch);
+      if (partner && round.kind === 'daily') {
+        const theirs = one<AnswerRow>('SELECT * FROM answers WHERE round_id = ? AND user_id = ?', round.id, partner.id);
+        void pushReveal(partner, user.name, !!theirs && theirs.choice === choice);
+      }
     } else {
       sendTo(partner?.id, { type: 'partner_answered', roundId: round.id });
     }

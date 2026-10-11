@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GestureType } from '@polovinka/shared';
 import { GESTURE_CHIPS, GESTURE_LABELS } from '@polovinka/shared';
-import { api, clientId } from '../lib/api';
+import { api, clientId, QueuedError } from '../lib/api';
 import { useStore } from '../lib/store';
 import { Button, Card, Chip, Label } from '../components/ui';
 import { InviteCard } from '../components/InviteCard';
@@ -19,6 +19,7 @@ export function Gesture() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [queued, setQueued] = useState(false);
 
   if (!me) return null;
   if (!me.partner) {
@@ -56,6 +57,12 @@ export function Gesture() {
       setSent(true);
       void refresh();
       window.setTimeout(() => nav('/'), 900);
+    } catch (e) {
+      if (e instanceof QueuedError) {
+        setSent(true);
+        setQueued(true);
+        window.setTimeout(() => nav('/'), 1500);
+      }
     } finally {
       setBusy(false);
     }
@@ -107,7 +114,7 @@ export function Gesture() {
       </div>
 
       <Button className="mt-4 w-full" big onClick={send} disabled={busy || sent}>
-        {sent ? 'Отправлено ♥' : 'Отправить'}
+        {sent ? (queued ? 'Отправится, когда появится сеть' : 'Отправлено ♥') : 'Отправить'}
       </Button>
       {text.trim() && !saved && (
         <button className="mt-3 w-full text-center text-xs text-muted underline decoration-dotted" onClick={saveTemplate}>

@@ -4,6 +4,8 @@ import { useStore } from '../lib/store';
 import { Button, Card, Label, Sheet } from '../components/ui';
 import { InviteCard } from '../components/InviteCard';
 import { CustomQuestions } from '../components/CustomQuestions';
+import { NotificationSettings } from '../components/NotificationSettings';
+import { InstallCard } from '../components/InstallCard';
 import { CATEGORY_LABELS, GESTURE_LABELS } from '@polovinka/shared';
 import { Chip } from '../components/ui';
 
@@ -139,10 +141,13 @@ export function Settings() {
         )}
       </Card>
 
-      <Card className="mt-4">
-        <Label>Уведомления</Label>
-        <p className="mt-2 text-sm text-muted">Утренний вопрос и вечернее раскрытие появятся на этапе 4. Время: {me.user.notifMorning} и {me.user.notifEvening}.</p>
-      </Card>
+      <div className="mt-4">
+        <NotificationSettings />
+      </div>
+
+      <div className="mt-4">
+        <InstallCard />
+      </div>
 
       <Card className="mt-4">
         <Label>Приватность</Label>
@@ -155,7 +160,7 @@ export function Settings() {
         </Button>
       </Card>
 
-      <p className="mt-6 text-center text-xs text-muted">Мы на % · этап 3</p>
+      <p className="mt-6 text-center text-xs text-muted">Мы на % · этап 4</p>
 
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Удалить нашу историю?">
         <p className="text-sm text-muted">Исчезнут все ответы, «почему» и жесты у обоих. Вернуть будет нельзя.</p>

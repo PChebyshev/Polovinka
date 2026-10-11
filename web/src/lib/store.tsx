@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { GesturePublic, MeResponse, ServerEvent, TodayResponse } from '@polovinka/shared';
-import { api, ApiError, getToken, setToken } from './api';
+import { api, ApiError, getToken, setToken, lastFromCache } from './api';
+import { onFlushed } from './sw';
+import { saveTokenForSw } from './queue';
 
 interface Store {
   ready: boolean;
@@ -37,14 +39,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     try {
       const m = await api.me();
-      setMeState(m);
+      const meCached = lastFromCache;
+      setMeState((prev) => (meCached && prev ? prev : m));
       try {
-        setTodayState(await api.today());
+        const t = await api.today();
+        const todayCached = lastFromCache;
+        // Снимок из кэша не должен затирать оптимистичное состояние.
+        setTodayState((prev) => (todayCached && prev ? prev : t));
+        setOffline(todayCached);
       } catch (e) {
         if (e instanceof ApiError && e.code === 'no_questions_left') setError('no_questions_left');
       }
       setError(null);
-      setOffline(false);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         setToken(null);
@@ -62,6 +68,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
+    return onFlushed(() => void refresh());
   }, [refresh]);
 
   // Обновление при возврате на вкладку и восстановлении сети.
@@ -127,11 +134,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setToday: (t) => setTodayState((prev) => (typeof t === 'function' ? t(prev) : t)),
       login: (token, m) => {
         setToken(token);
+        void saveTokenForSw(token);
         setMeState(m);
         void refresh();
       },
       logout: () => {
         setToken(null);
+        void saveTokenForSw(null);
         setMeState(null);
         setTodayState(null);
       },

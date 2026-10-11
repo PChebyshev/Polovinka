@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RoundPublic } from '@polovinka/shared';
-import { api, ApiError, clientId } from '../lib/api';
+import { api, ApiError, clientId, QueuedError } from '../lib/api';
+import { InstallCard } from '../components/InstallCard';
 import { useStore } from '../lib/store';
 import { formatDate, matchPercent, nDays, nDiscoveries } from '../lib/format';
 import { Button, Card, Label, Spinner } from '../components/ui';
@@ -16,6 +17,7 @@ export function Home() {
   const { me, today, setToday, refresh, error, offline } = useStore();
   const [busy, setBusy] = useState(false);
   const [bonusBusy, setBonusBusy] = useState(false);
+  const [queuedNote, setQueuedNote] = useState(false);
 
   if (!me) return null;
   const partner = me.partner;
@@ -37,7 +39,8 @@ export function Home() {
       patchRound(r);
       void refresh();
     } catch (e) {
-      if (!(e instanceof TypeError)) await refresh();
+      if (e instanceof QueuedError) setQueuedNote(true);
+      else if (!(e instanceof TypeError)) await refresh();
     } finally {
       setBusy(false);
     }
@@ -119,7 +122,7 @@ export function Home() {
       </header>
       {partner && <LevelBar counters={c} />}
 
-      {offline && <div className="mb-3 rounded-2xl bg-surface-2 px-4 py-2 text-center text-xs text-muted">Нет сети. Ответы сохранятся и отправятся, когда она появится.</div>}
+      {(offline || queuedNote) && <div className="mb-3 rounded-2xl bg-surface-2 px-4 py-2 text-center text-xs text-muted">Нет сети. Ответ сохранён на телефоне и отправится, когда она появится.</div>}
 
       <div className="space-y-4">
         {me.unseenGestures.map((g) => (
@@ -171,6 +174,8 @@ export function Home() {
 
         {!today && !error && !me.pair.isGuest ? <Spinner /> : null}
         {today?.daily && renderRound(today.daily)}
+
+        {today?.daily?.status === 'revealed' && <InstallCard />}
 
         {today?.bonus.map((r) => renderRound(r))}
 

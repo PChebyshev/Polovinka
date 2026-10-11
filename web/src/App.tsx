@@ -11,6 +11,7 @@ import { Week } from './screens/Week';
 import { WeekPublicScreen } from './screens/WeekPublic';
 import { Challenge } from './screens/Challenge';
 import { NewChallenge } from './screens/NewChallenge';
+import { Stats } from './screens/Stats';
 import { CelebrationOverlay } from './components/Celebration';
 import { Spinner, Heart } from './components/ui';
 import { GestureCard } from './components/GestureToast';
@@ -19,7 +20,7 @@ import { api } from './lib/api';
 function Nav() {
   const { me } = useStore();
   const loc = useLocation();
-  if (!me || loc.pathname.startsWith('/j/') || loc.pathname.startsWith('/w/')) return null;
+  if (!me || loc.pathname.startsWith('/j/') || loc.pathname.startsWith('/w/') || loc.pathname === '/stats') return null;
   const item = (to: string, label: string, icon: ReactElement) => (
     <NavLink
       to={to}
@@ -97,7 +98,7 @@ function Shell() {
   const { ready, me } = useStore();
   const loc = useLocation();
   if (!ready) return <Spinner />;
-  const publicPath = ['/j/', '/w/', '/c/'].some((p) => loc.pathname.startsWith(p));
+  const publicPath = ['/j/', '/w/', '/c/', '/stats'].some((p) => loc.pathname.startsWith(p));
   if (!me && !publicPath) return <Onboarding />;
   return (
     <>
@@ -110,6 +111,7 @@ function Shell() {
         <Route path="/w/:code" element={<WeekPublicScreen />} />
         <Route path="/c/:code" element={<Challenge />} />
         <Route path="/challenge" element={<NewChallenge />} />
+        <Route path="/stats" element={<Stats />} />
         <Route path="/j/:code" element={<Join />} />
         <Route path="*" element={<Home />} />
       </Routes>
