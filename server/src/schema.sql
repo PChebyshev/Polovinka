@@ -169,3 +169,21 @@ CREATE TABLE IF NOT EXISTS events (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_type_time ON events(type, created_at);
+
+-- Дополнительные устройства одного пользователя (Safari и приложение на экране «Домой» на iOS не делят хранилище).
+CREATE TABLE IF NOT EXISTS user_tokens (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS user_tokens_user ON user_tokens(user_id);
+
+-- Короткие одноразовые коды для переноса входа на другое устройство.
+CREATE TABLE IF NOT EXISTS login_codes (
+  code TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL
+);

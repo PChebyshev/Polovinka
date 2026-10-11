@@ -6,6 +6,7 @@ import { InviteCard } from '../components/InviteCard';
 import { CustomQuestions } from '../components/CustomQuestions';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { InstallCard } from '../components/InstallCard';
+import { LoginCodeBox } from '../components/LoginCode';
 import { CATEGORY_LABELS, GESTURE_LABELS } from '@polovinka/shared';
 import { Chip } from '../components/ui';
 
@@ -141,6 +142,14 @@ export function Settings() {
         )}
       </Card>
 
+      <Card className="mt-4">
+        <Label>Вход на другом устройстве</Label>
+        <p className="mt-2 text-sm text-muted">
+          Для второго телефона или приложения на экране «Домой» на iPhone: там нажмите «У меня уже есть аккаунт» и введите код.
+        </p>
+        <LoginCodeBox />
+      </Card>
+
       <div className="mt-4">
         <NotificationSettings />
       </div>
@@ -175,7 +184,7 @@ export function Settings() {
       </Sheet>
 
       <Sheet open={confirmLogout} onClose={() => setConfirmLogout(false)} title="Выйти с этого телефона?">
-        <p className="text-sm text-muted">Аккаунт привязан к этому телефону без пароля. После выхода вернуться в эту пару можно только по новой ссылке от половинки.</p>
+        <p className="text-sm text-muted">Аккаунт без пароля. Вернуться можно по коду из «Вход на другом устройстве» на другом вашем устройстве, где вы уже вошли. Если такого нет, вернуться не получится.</p>
         <div className="mt-4 flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => setConfirmLogout(false)}>
             Остаться

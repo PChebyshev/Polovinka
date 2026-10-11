@@ -9,6 +9,21 @@ export function NotificationSettings() {
   const [subscribed, setSubscribed] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [testNote, setTestNote] = useState<string | null>(null);
+
+  const test = async () => {
+    setTestNote('Отправляю…');
+    try {
+      const r = await api.pushTest();
+      if (r.tooSoon) setTestNote('Подождите полминуты перед следующей проверкой.');
+      else if (r.disabled) setTestNote('Push выключен на сервере.');
+      else if (r.sent > 0) setTestNote('Отправлено. Уведомление должно прийти в течение минуты. Если нет — проверьте, что уведомления для «Мы на %» разрешены в настройках телефона.');
+      else if (r.failed > 0) setTestNote(`Сервис уведомлений отказал (код ${r.statuses.join(', ')}). Выключите и снова включите уведомления на этом телефоне.`);
+      else setTestNote('Этот телефон не подписан. Нажмите «Включить на этом телефоне».');
+    } catch {
+      setTestNote('Не удалось связаться с сервером.');
+    }
+  };
   const support = pushSupport();
 
   useEffect(() => {
@@ -61,6 +76,12 @@ export function NotificationSettings() {
         </Button>
       )}
       {note && <p className="mt-2 text-sm text-rose">{note}</p>}
+      {support === 'ok' && subscribed && (
+        <Button variant="ghost" className="mt-1 w-full" onClick={test}>
+          Проверить уведомление
+        </Button>
+      )}
+      {testNote && <p className="mt-1 text-center text-xs text-muted">{testNote}</p>}
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <label>

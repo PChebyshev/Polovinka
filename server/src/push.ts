@@ -93,6 +93,35 @@ export async function sendPush(user: UserRow, kind: 'morning' | 'evening', paylo
   return ok;
 }
 
+/** Пробное уведомление по кнопке в настройках: без дневного лимита, но не чаще раза в 30 секунд. */
+const lastTest = new Map<string, number>();
+export async function sendTestPush(user: UserRow): Promise<{ sent: number; failed: number; statuses: number[]; tooSoon?: boolean }> {
+  const now = Date.now();
+  if (now - (lastTest.get(user.id) ?? 0) < 30_000) return { sent: 0, failed: 0, statuses: [], tooSoon: true };
+  lastTest.set(user.id, now);
+  const subs = all<SubRow>('SELECT * FROM push_subscriptions WHERE user_id = ?', user.id);
+  let sent = 0;
+  let failed = 0;
+  const statuses: number[] = [];
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        JSON.stringify({ title: 'Мы на %', body: 'Уведомления работают. Утром — вопрос, вечером — раскрытие.', url: '/settings', tag: 'test' }),
+        { TTL: 600, urgency: 'high' },
+      );
+      if (s.failed_at) run('UPDATE push_subscriptions SET failed_at = NULL WHERE id = ?', s.id);
+      sent++;
+    } catch (e) {
+      failed++;
+      const status = (e as { statusCode?: number }).statusCode ?? 0;
+      statuses.push(status);
+      if (status === 404 || status === 410) run('DELETE FROM push_subscriptions WHERE id = ?', s.id);
+    }
+  }
+  return { sent, failed, statuses };
+}
+
 function hhmm(tz: string): string {
   const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false });
   return f.format(new Date()).replace('24', '00');

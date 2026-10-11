@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
-import { all, one, run, logEvent } from './db.js';
-import { newId, nowIso } from './ids.js';
+import { all, one, run, logEvent, type UserRow } from './db.js';
+import { hashToken, newId, newToken, nowIso } from './ids.js';
+import { randomInt } from 'node:crypto';
 import { requireUser } from './auth.js';
-import { pushEnabled, pushPublicKey } from './push.js';
+import { pushEnabled, pushPublicKey, sendTestPush } from './push.js';
 import { computeStats } from './stats.js';
 
 function keyOk(given: unknown): boolean {
@@ -14,7 +15,63 @@ function keyOk(given: unknown): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export async function registerStage4Routes(app: FastifyInstance) {
+// Без похожих символов (0/O, 1/I/L), чтобы код легко переписать с экрана.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CODE_LEN = 6;
+const CODE_TTL_MIN = 30;
+
+function newLoginCode(): string {
+  let s = '';
+  for (let i = 0; i < CODE_LEN; i++) s += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  return s;
+}
+
+/** Ограничение попыток ввода кода: 10 за 10 минут с одного IP. */
+const attempts = new Map<string, number[]>();
+function tooManyAttempts(ip: string): boolean {
+  const now = Date.now();
+  const list = (attempts.get(ip) ?? []).filter((t) => now - t < 10 * 60_000);
+  list.push(now);
+  attempts.set(ip, list);
+  return list.length > 10;
+}
+
+export async function registerStage4Routes(app: FastifyInstance, deps: { meResponse: (u: UserRow) => unknown }) {
+  // --- Перенос входа на другое устройство ---------------------------------------
+
+  app.post('/api/login-codes', { preHandler: requireUser }, async (req) => {
+    const user = req.user!;
+    const ts = nowIso();
+    run('DELETE FROM login_codes WHERE user_id = ? OR expires_at < ?', user.id, ts);
+    let code = newLoginCode();
+    while (one('SELECT 1 FROM login_codes WHERE code = ?', code)) code = newLoginCode();
+    const expires = new Date(Date.now() + CODE_TTL_MIN * 60_000).toISOString();
+    run('INSERT INTO login_codes (code, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)', code, user.id, expires, ts);
+    logEvent('login_code_created', { pairId: user.pair_id, userId: user.id });
+    return { code, expiresAt: expires };
+  });
+
+  app.post('/api/login-codes/redeem', async (req, reply) => {
+    if (tooManyAttempts(req.ip)) return reply.code(429).send({ error: 'too_many_attempts' });
+    const raw = ((req.body ?? {}) as { code?: unknown }).code;
+    const code = typeof raw === 'string' ? raw.toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+    if (code.length !== CODE_LEN) return reply.code(400).send({ error: 'code' });
+    const row = one<{ user_id: string; expires_at: string; used_at: string | null }>('SELECT * FROM login_codes WHERE code = ?', code);
+    if (!row || row.used_at || row.expires_at < nowIso()) return reply.code(404).send({ error: 'code_invalid' });
+    const user = one<UserRow>('SELECT * FROM users WHERE id = ?', row.user_id);
+    if (!user) return reply.code(404).send({ error: 'code_invalid' });
+    const token = newToken();
+    run('UPDATE login_codes SET used_at = ? WHERE code = ?', nowIso(), code);
+    run('INSERT INTO user_tokens (token_hash, user_id, created_at) VALUES (?, ?, ?)', hashToken(token), user.id, nowIso());
+    logEvent('login_code_redeemed', { pairId: user.pair_id, userId: user.id });
+    return { token, me: deps.meResponse(user) };
+  });
+
+  app.post('/api/push/test', { preHandler: requireUser }, async (req) => {
+    if (!pushEnabled()) return { sent: 0, failed: 0, statuses: [], disabled: true };
+    return sendTestPush(req.user!);
+  });
+
   app.get('/api/push/key', async () => ({ enabled: pushEnabled(), key: pushPublicKey() }));
 
   app.post('/api/push/subscribe', { preHandler: requireUser }, async (req, reply) => {

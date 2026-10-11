@@ -159,7 +159,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
 
   await registerStage2Routes(app, { meResponse });
   await registerStage3Routes(app, { meResponse, dataDir: opts.dataDir });
-  await registerStage4Routes(app);
+  await registerStage4Routes(app, { meResponse });
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };

@@ -17,7 +17,11 @@ export function readToken(req: FastifyRequest): string | null {
 
 export function userByToken(token: string | null): UserRow | undefined {
   if (!token || token.length < 32) return undefined;
-  return one<UserRow>('SELECT * FROM users WHERE token_hash = ?', hashToken(token));
+  const h = hashToken(token);
+  return (
+    one<UserRow>('SELECT * FROM users WHERE token_hash = ?', h) ??
+    one<UserRow>('SELECT u.* FROM user_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?', h)
+  );
 }
 
 export async function requireUser(req: FastifyRequest, reply: FastifyReply) {
