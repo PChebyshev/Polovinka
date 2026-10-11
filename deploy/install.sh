@@ -3,6 +3,8 @@
 # Запуск под root:
 #   curl -fsSL https://raw.githubusercontent.com/PChebyshev/Polovinka/claude/plan-and-data-model/deploy/install.sh | bash
 # Можно заранее задать переменные: DOMAIN, STATS_KEY, VAPID_EMAIL, BRANCH, APP_DIR.
+# Сменить домен на уже установленном сервере:
+#   curl -fsSL https://raw.githubusercontent.com/PChebyshev/Polovinka/claude/plan-and-data-model/deploy/install.sh | DOMAIN=mydomain.ru bash
 set -euo pipefail
 
 # Тело в фигурных скобках: при «curl | bash» скрипт читается целиком до запуска.
@@ -82,10 +84,19 @@ ok "ветка ${BRANCH}, коммит $(git rev-parse --short HEAD)"
 
 # --- 5. Настройки (.env) ------------------------------------------------------------
 ip=$(curl -fsS4 --max-time 5 https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')
-if [ -f .env ] && [ -z "${DOMAIN:-}" ]; then
-  say "Найден .env, оставляю настройки как есть"
+NEW_DOMAIN="${DOMAIN:-}"
+NEW_DOMAIN="${NEW_DOMAIN#http://}"; NEW_DOMAIN="${NEW_DOMAIN#https://}"; NEW_DOMAIN="${NEW_DOMAIN%%/*}"; NEW_DOMAIN="${NEW_DOMAIN#www.}"
+if [ -f .env ]; then
   # shellcheck disable=SC1091
   . ./.env
+  if [ -n "$NEW_DOMAIN" ] && [ "$NEW_DOMAIN" != "${DOMAIN:-}" ]; then
+    say "Меняю домен: ${DOMAIN:-нет} → ${NEW_DOMAIN}"
+    sed -i "s/^DOMAIN=.*/DOMAIN=${NEW_DOMAIN}/" .env
+    DOMAIN="$NEW_DOMAIN"
+    ok "ключ статистики и почта остались прежними"
+  else
+    say "Найден .env, оставляю настройки как есть"
+  fi
 else
   say "Настройки"
   echo "IP этого сервера: ${ip}"
@@ -94,7 +105,7 @@ else
   DOMAIN="${DOMAIN:-$(ask 'Домен (например, mynaprocent.ru): ' "${ip//./-}.sslip.io")}"
   VAPID_EMAIL="${VAPID_EMAIL:-$(ask 'Ваша почта (нужна push-сервисам, никуда не публикуется): ' 'admin@example.com')}"
   STATS_KEY="${STATS_KEY:-$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20)}"
-  DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"
+  DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN%%/*}"; DOMAIN="${DOMAIN#www.}"
   umask 077
   cat > .env <<ENV
 DOMAIN=${DOMAIN}

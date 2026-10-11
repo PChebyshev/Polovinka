@@ -4,3 +4,9 @@
 		flush_interval -1
 	}
 }
+
+# www.домен → домен. Если A-записи для www нет, Caddy просто не получит
+# для неё сертификат, основной адрес это не затрагивает.
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
