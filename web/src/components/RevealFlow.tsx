@@ -12,10 +12,19 @@ function loadStage(id: string): Stage {
   try {
     const v = localStorage.getItem(STAGE_KEY(id));
     if (v === 'done') return 'done';
+    if (v === 'seen') return 'result';
   } catch {
     /* пусто */
   }
   return 'flip';
+}
+
+function remember(id: string, v: 'seen' | 'done') {
+  try {
+    localStorage.setItem(STAGE_KEY(id), v);
+  } catch {
+    /* пусто */
+  }
 }
 
 export function RevealFlow({
@@ -34,7 +43,7 @@ export function RevealFlow({
   bonusLeft?: number;
 }) {
   const [stage, setStage] = useState<Stage>(() => loadStage(round.id));
-  const [flipped, setFlipped] = useState(stage === 'done');
+  const [flipped, setFlipped] = useState(stage !== 'flip');
   const [whyText, setWhyText] = useState('');
   const [chip, setChip] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,20 +64,17 @@ export function RevealFlow({
     const t1 = window.setTimeout(() => setFlipped(true), 400);
     const t2 = window.setTimeout(() => {
       buzz(same ? [20, 60, 20, 60, 40] : [20, 60, 20]);
+      remember(round.id, 'seen');
       setStage('result');
     }, 1300);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [stage, same]);
+  }, [stage, same, round.id]);
 
   const finish = () => {
-    try {
-      localStorage.setItem(STAGE_KEY(round.id), 'done');
-    } catch {
-      /* пусто */
-    }
+    remember(round.id, 'done');
     setStage('done');
   };
 

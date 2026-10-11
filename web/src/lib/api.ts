@@ -1,4 +1,4 @@
-import type { CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse } from '@polovinka/shared';
+import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
 
@@ -58,7 +58,8 @@ export function clientId(): string {
 }
 
 export const api = {
-  createUser: (name: string, joinCode?: string) => request<{ token: string; me: MeResponse }>('POST', '/api/users', { name, tz: deviceTz(), joinCode }),
+  createUser: (name: string, joinCode?: string, challengeCode?: string) =>
+    request<{ token: string; me: MeResponse }>('POST', '/api/users', { name, tz: deviceTz(), joinCode, challengeCode }),
   me: () => request<MeResponse>('GET', '/api/me'),
   updateMe: (patch: { name?: string; notifMorning?: string; notifEvening?: string; notifEnabled?: boolean; tz?: string }) => request<MeResponse>('PUT', '/api/me', patch),
   invite: () => request<{ code: string; url: string; text: string }>('GET', '/api/invite'),
@@ -90,4 +91,18 @@ export const api = {
   addTemplate: (type: string, text: string) => request<{ templates: GestureTemplate[] }>('POST', '/api/gesture-templates', { type, text }),
   deleteTemplate: (id: string) => request<{ templates: GestureTemplate[] }>('DELETE', `/api/gesture-templates/${id}`),
   setTheme: (theme: string | null) => request<MeResponse>('PUT', '/api/pair/theme', { theme }),
+  // Этап 3
+  week: (offset = 0) => request<WeekResponse>('GET', `/api/week?offset=${offset}`),
+  weekPublic: (code: string) => request<WeekPublic>('GET', `/api/week/public/${encodeURIComponent(code)}`),
+  weekShared: (via: string) => request<{ ok: true }>('POST', `/api/week/x/shared`, { via }),
+  uploadWeekImage: async (code: string, blob: Blob) => {
+    const token = getToken();
+    const res = await fetch(`/api/week/${code}/image`, { method: 'POST', headers: { 'content-type': 'image/png', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: blob });
+    if (!res.ok) throw new ApiError(res.status, 'upload');
+  },
+  createChallenge: () => request<{ code: string; url: string; text: string; compare: ChallengeCompare }>('POST', '/api/challenges'),
+  challengeInfo: (code: string) => request<ChallengeInfo>('GET', `/api/challenges/${encodeURIComponent(code)}`),
+  joinChallenge: (code: string) => request<ChallengeCompare>('POST', `/api/challenges/${encodeURIComponent(code)}/join`),
+  challengeCompare: (code: string) => request<ChallengeCompare>('GET', `/api/challenges/${encodeURIComponent(code)}/compare`),
+  convertPair: () => request<MeResponse>('POST', '/api/pair/convert'),
 };

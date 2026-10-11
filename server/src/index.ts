@@ -3,7 +3,15 @@ import fastifyStatic from '@fastify/static';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb, one, type PairRow, type UserRow } from './db.js';
+import { openDb, one, all, type PairRow, type UserRow } from './db.js';
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
 import { registerRoutes } from './routes.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -20,7 +28,7 @@ openDb(DATA_DIR);
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustProxy: true });
 
-await registerRoutes(app);
+await registerRoutes(app, { dataDir: DATA_DIR });
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -38,6 +46,34 @@ function ogFor(path: string, base: string): Og {
     description: 'Один вопрос в день на двоих. 20 секунд утром, маленькое открытие вечером.',
     image: `${base}/og-default.png`,
   };
+  const c = path.match(/^\/c\/([a-z0-9]+)/);
+  if (c) {
+    const ch = one<{ from_pair_id: string }>('SELECT from_pair_id FROM challenges WHERE code = ?', c[1]);
+    if (ch) {
+      const names = all<UserRow>('SELECT * FROM users WHERE pair_id = ? ORDER BY created_at', ch.from_pair_id).map((u) => u.name);
+      const title = names.length > 1 ? `${names[0]} и ${names[1]}` : names[0] ?? 'Пара';
+      return {
+        title: `${title} бросают вам вызов: 5 вопросов`,
+        description: 'Пройдите те же вопросы со своей половинкой, а потом сравним, где совпали. Без победителей.',
+        image: def.image,
+      };
+    }
+  }
+  const w = path.match(/^\/w\/([a-z0-9]+)/);
+  if (w) {
+    const card = one<{ pair_id: string; stats: string; png_path: string | null }>('SELECT pair_id, stats, png_path FROM weekly_cards WHERE code = ?', w[1]);
+    if (card) {
+      const names = all<UserRow>('SELECT * FROM users WHERE pair_id = ? ORDER BY created_at', card.pair_id).map((u) => u.name);
+      const st = JSON.parse(card.stats) as { discoveries: number; matchPercent: number | null };
+      const title = names.length > 1 ? `${names[0]} и ${names[1]}` : names[0] ?? 'Пара';
+      const pct = st.matchPercent === null ? '' : `, совпали на ${st.matchPercent}%`;
+      return {
+        title: `${title}: ${st.discoveries} ${plural(st.discoveries, 'открытие', 'открытия', 'открытий')} за неделю${pct}`,
+        description: 'Один вопрос в день на двоих. Попробуйте свой ритуал в «Мы на %».',
+        image: card.png_path && existsSync(card.png_path) ? `${base}/api/week/${w[1]}/image.png` : def.image,
+      };
+    }
+  }
   const m = path.match(/^\/j\/([a-z0-9]+)/);
   if (m) {
     const pair = one<PairRow>('SELECT * FROM pairs WHERE invite_code = ?', m[1]);

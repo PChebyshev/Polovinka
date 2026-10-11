@@ -10,6 +10,7 @@ import { InviteCard } from '../components/InviteCard';
 import { RevealFlow } from '../components/RevealFlow';
 import { GestureCard } from '../components/GestureToast';
 import { LevelBar } from '../components/LevelBar';
+import { Link } from 'react-router-dom';
 
 export function Home() {
   const { me, today, setToday, refresh, error, offline } = useStore();
@@ -24,7 +25,7 @@ export function Home() {
     setToday((prev) => {
       if (!prev) return prev;
       const swap = (x: RoundPublic) => (x.id === r.id ? r : x);
-      return { ...prev, daily: swap(prev.daily), bonus: prev.bonus.map(swap), pending: prev.pending.map(swap) };
+      return { ...prev, daily: prev.daily ? swap(prev.daily) : null, bonus: prev.bonus.map(swap), pending: prev.pending.map(swap) };
     });
 
   const answer = async (round: RoundPublic, choice: string, guess: string | null) => {
@@ -100,6 +101,7 @@ export function Home() {
 
   const c = me.counters;
   const pct = matchPercent(c.matches, c.discoveries);
+  const isSunday = new Date().getDay() === 0;
 
   return (
     <div className="mx-auto max-w-md px-4 pb-28 pt-4">
@@ -124,7 +126,39 @@ export function Home() {
           <GestureCard key={g.id} gesture={g} fromName={partner?.name ?? 'половинка'} onSeen={() => seenGesture(g.id)} />
         ))}
 
-        {!partner && !today?.daily.mine && <InviteCard />}
+        {me.challenges.map((ch) => (
+          <Link key={ch.code} to={`/c/${ch.code}`} className="block rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
+            <div className="text-xs uppercase tracking-wider text-muted">{ch.isSender ? 'Ваш вызов' : `Вызов от ${ch.fromNames[1] ? `${ch.fromNames[0]} и ${ch.fromNames[1]}` : ch.fromNames[0]}`}</div>
+            <div className="mt-1 text-sm">
+              {ch.answered < ch.total ? `Пройдено ${ch.answered} из ${ch.total}` : ch.otherJoined ? 'Сравнение готово' : 'Ждём вторую пару'} →
+            </div>
+          </Link>
+        ))}
+
+        {me.pair.isGuest && (
+          <Card tone="accent">
+            <Label>Продолжить вместе</Label>
+            <p className="mt-2 text-sm text-muted">Пока вы гости по вызову друзей. Один тап, и у вас будет свой вопрос каждый день.</p>
+            <Button
+              className="mt-3 w-full"
+              onClick={async () => {
+                await api.convertPair();
+                await refresh();
+              }}
+            >
+              Начать свой ритуал
+            </Button>
+          </Card>
+        )}
+
+        {isSunday && partner && (
+          <Link to="/week" className="block rounded-2xl border border-sand/40 bg-sand/10 px-4 py-3">
+            <div className="text-xs uppercase tracking-wider text-muted">Воскресенье</div>
+            <div className="mt-1 text-sm">Итог недели готов. Посмотреть и поделиться →</div>
+          </Link>
+        )}
+
+        {!partner && !today?.daily?.mine && <InviteCard />}
 
         {today?.pending.map((r) => renderRound(r, `${partner?.name ?? 'Половинка'} ждёт ответ за ${formatDate(r.date)}`))}
 
@@ -135,12 +169,12 @@ export function Home() {
           </Card>
         )}
 
-        {!today && !error ? <Spinner /> : null}
-        {today && renderRound(today.daily)}
+        {!today && !error && !me.pair.isGuest ? <Spinner /> : null}
+        {today?.daily && renderRound(today.daily)}
 
         {today?.bonus.map((r) => renderRound(r))}
 
-        {today && today.daily.mine && today.daily.status !== 'revealed' && today.bonusLeft > 0 && partner && (
+        {today?.daily && today.daily.mine && today.daily.status !== 'revealed' && today.bonusLeft > 0 && partner && (
           <Button variant="ghost" className="w-full" onClick={bonus} disabled={bonusBusy}>
             Пока ждём, ещё один вопрос? Осталось {today.bonusLeft}
           </Button>

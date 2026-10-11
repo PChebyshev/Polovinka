@@ -155,7 +155,7 @@ export function Settings() {
         </Button>
       </Card>
 
-      <p className="mt-6 text-center text-xs text-muted">Мы на % · этап 2</p>
+      <p className="mt-6 text-center text-xs text-muted">Мы на % · этап 3</p>
 
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Удалить нашу историю?">
         <p className="text-sm text-muted">Исчезнут все ответы, «почему» и жесты у обоих. Вернуть будет нельзя.</p>

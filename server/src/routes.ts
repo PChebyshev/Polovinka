@@ -10,6 +10,7 @@ import { counters, gesturePublic, pairPublic, partnerOf, roundPublic, userPublic
 import { addClient, sendTo } from './sse.js';
 import { checkMilestones, unseenCelebrations } from './levels.js';
 import { registerStage2Routes, gestureTemplatesOf } from './routes2.js';
+import { registerStage3Routes, joinChallenge, challengeOfRound, notifyChallenge, myChallenges } from './routes3.js';
 
 const MAX_BONUS_PER_DAY = 3;
 const NAME_MAX = 24;
@@ -41,11 +42,15 @@ function publicBase(req: { headers: Record<string, string | string[] | undefined
   return `${proto}://${host}`;
 }
 
-function createSoloPair(tz: string): PairRow {
+function createSoloPair(tz: string, guest = false): PairRow {
   const id = newId();
   const ts = nowIso();
-  run('INSERT INTO pairs (id, invite_code, tz, created_at) VALUES (?, ?, ?, ?)', id, newCode(), tz, ts);
+  run('INSERT INTO pairs (id, invite_code, tz, is_guest, created_at) VALUES (?, ?, ?, ?, ?)', id, newCode(), tz, guest ? 1 : 0, ts);
   return one<PairRow>('SELECT * FROM pairs WHERE id = ?', id)!;
+}
+
+function challengeByCodeRow(code: string) {
+  return one<{ id: string; code: string; from_pair_id: string; question_ids: string; created_at: string; opened_count: number }>('SELECT * FROM challenges WHERE code = ?', code.trim().toLowerCase());
 }
 
 /** Создаёт раунд дня, если его ещё нет. Возвращает undefined, если вопросы кончились. */
@@ -80,6 +85,7 @@ function meResponse(user: UserRow): MeResponse {
     celebrations: unseenCelebrations(pair.id, user.id),
     weekTheme: pair.week_theme,
     gestureTemplates: gestureTemplatesOf(pair.id),
+    challenges: myChallenges(user),
   };
 }
 
@@ -92,13 +98,13 @@ function normalizeChoice(raw: unknown, format: string, me: UserRow, partner: Use
   return raw;
 }
 
-export async function registerRoutes(app: FastifyInstance) {
+export async function registerRoutes(app: FastifyInstance, opts: { dataDir: string }) {
   app.get('/api/health', async () => ({ ok: true }));
 
   // --- Аккаунт -------------------------------------------------------------
 
   app.post('/api/users', async (req, reply) => {
-    const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; joinCode?: unknown };
+    const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; joinCode?: unknown; challengeCode?: unknown };
     const name = cleanName(body.name);
     if (!name) return reply.code(400).send({ error: 'name' });
     const tz = isValidTz(body.tz) ? body.tz : 'Europe/Moscow';
@@ -116,6 +122,12 @@ export async function registerRoutes(app: FastifyInstance) {
       pair = target;
       joined = true;
     }
+    let challenge: ReturnType<typeof challengeByCodeRow> | undefined;
+    if (!pair && typeof body.challengeCode === 'string' && body.challengeCode) {
+      challenge = challengeByCodeRow(body.challengeCode);
+      if (!challenge) return reply.code(404).send({ error: 'not_found' });
+      pair = createSoloPair(tz, true);
+    }
     if (!pair) pair = createSoloPair(tz);
 
     run(
@@ -129,6 +141,10 @@ export async function registerRoutes(app: FastifyInstance) {
     );
     logEvent('user_created', { pairId: pair.id, userId: id, meta: { joined } });
     const user = one<UserRow>('SELECT * FROM users WHERE id = ?', id)!;
+    if (challenge) {
+      joinChallenge(challenge, pair);
+      notifyChallenge(challenge);
+    }
     if (joined) {
       logEvent('invite_accepted', { pairId: pair.id, userId: id });
       const partner = partnerOf(user);
@@ -140,6 +156,7 @@ export async function registerRoutes(app: FastifyInstance) {
   app.get('/api/me', { preHandler: requireUser }, async (req) => meResponse(req.user!));
 
   await registerStage2Routes(app, { meResponse });
+  await registerStage3Routes(app, { meResponse, dataDir: opts.dataDir });
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };
@@ -224,8 +241,8 @@ export async function registerRoutes(app: FastifyInstance) {
     const pair = pairOf(user);
     const partner = partnerOf(user);
     const date = dateInTz(pair.tz);
-    const daily = ensureDaily(pair, date);
-    if (!daily) return reply.code(503).send({ error: 'no_questions_left' });
+    const daily = pair.is_guest ? null : ensureDaily(pair, date);
+    if (!daily && !pair.is_guest) return reply.code(503).send({ error: 'no_questions_left' });
     const bonus = all<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'bonus' ORDER BY created_at`, pair.id, date);
     const pending = all<RoundRow>(
       `SELECT r.* FROM rounds r
@@ -238,7 +255,7 @@ export async function registerRoutes(app: FastifyInstance) {
     );
     const res: TodayResponse = {
       date,
-      daily: roundPublic(daily, user, partner),
+      daily: daily ? roundPublic(daily, user, partner) : null,
       bonus: bonus.map((r) => roundPublic(r, user, partner)),
       bonusLeft: Math.max(0, MAX_BONUS_PER_DAY - bonus.length),
       pending: pending.map((r) => roundPublic(r, user, partner)),
@@ -313,6 +330,8 @@ export async function registerRoutes(app: FastifyInstance) {
     if (revealed) {
       logEvent('reveal', { pairId: user.pair_id, meta: { kind: round.kind } });
       sendTo(partner?.id, { type: 'revealed', roundId: round.id });
+      const ch = challengeOfRound(round);
+      if (ch) notifyChallenge(ch);
     } else {
       sendTo(partner?.id, { type: 'partner_answered', roundId: round.id });
     }

@@ -3,7 +3,7 @@ import { api, ApiError } from '../lib/api';
 import { useStore } from '../lib/store';
 import { Button, Heart } from '../components/ui';
 
-export function Onboarding({ joinCode, inviterName, onDone }: { joinCode?: string; inviterName?: string | null; onDone?: () => void }) {
+export function Onboarding({ joinCode, challengeCode, inviterName, intro, onDone }: { joinCode?: string; challengeCode?: string; inviterName?: string | null; intro?: string; onDone?: () => void }) {
   const { login } = useStore();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -16,7 +16,7 @@ export function Onboarding({ joinCode, inviterName, onDone }: { joinCode?: strin
     setBusy(true);
     setError(null);
     try {
-      const r = await api.createUser(n, joinCode);
+      const r = await api.createUser(n, joinCode, challengeCode);
       login(r.token, r.me);
       onDone?.();
     } catch (err) {
@@ -35,7 +35,9 @@ export function Onboarding({ joinCode, inviterName, onDone }: { joinCode?: strin
       </div>
       <h1 className="rise mt-5 text-4xl font-bold leading-tight">Мы на %</h1>
       <p className="rise-2 mt-3 text-lg text-muted">
-        {inviterName ? (
+        {intro ? (
+          intro
+        ) : inviterName ? (
           <>
             <span className="text-text">{inviterName}</span> зовёт тебя. Один вопрос в день на двоих, 20 секунд, и маленькое открытие вечером.
           </>
@@ -58,7 +60,7 @@ export function Onboarding({ joinCode, inviterName, onDone }: { joinCode?: strin
         </label>
         {error && <p className="text-sm text-rose">{error}</p>}
         <Button type="submit" big className="w-full" disabled={busy || !name.trim()}>
-          {inviterName ? 'Присоединиться' : 'Поехали'}
+          {challengeCode ? 'Принять вызов' : inviterName ? 'Присоединиться' : 'Поехали'}
         </Button>
         <p className="text-center text-xs text-muted">Без регистрации, почты и SMS. Ответы видны только вам двоим.</p>
       </form>

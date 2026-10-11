@@ -172,11 +172,13 @@ export interface MeResponse {
   celebrations: Celebration[];
   weekTheme: string | null;
   gestureTemplates: GestureTemplate[];
+  challenges: MyChallenge[];
 }
 
 export interface TodayResponse {
   date: string;
-  daily: RoundPublic;
+  /** null у гостевой пары, пока она не стала постоянной. */
+  daily: RoundPublic | null;
   bonus: RoundPublic[];
   bonusLeft: number;
   /** Старые раунды, где партнёр ждёт мой ответ. */
@@ -193,6 +195,7 @@ export type ServerEvent =
   | { type: 'history_deleted' }
   | { type: 'round_replaced'; roundId: string }
   | { type: 'pair_updated' }
+  | { type: 'challenge_update'; code: string }
   | { type: 'ping' };
 
 export const GESTURE_LABELS: Record<GestureType, string> = {
@@ -206,3 +209,76 @@ export const GESTURE_CHIPS: Record<GestureType, string[]> = {
   thinking: ['Скучаю', 'Хочу обнять', 'Жду вечера', 'Ты сейчас где-то там, а я тут улыбаюсь', 'Вспомнил(а) тебя — и стало теплее'],
   proud: ['Ты справляешься', 'Вижу, как ты стараешься', 'Ты сегодня молодец', 'Горжусь тем, какой(ая) ты', 'Ты сильнее, чем думаешь'],
 };
+
+// --- Этап 3 ---------------------------------------------------------------
+
+export interface WeekStats {
+  weekStart: string;
+  weekEnd: string;
+  discoveries: number;
+  matches: number;
+  matchPercent: number | null;
+  guessesRight: number;
+  daysBoth: number;
+  gestures: number;
+}
+
+export interface WeekResponse {
+  code: string;
+  names: [string, string | null];
+  stats: WeekStats;
+  isCurrent: boolean;
+  hasImage: boolean;
+}
+
+export interface WeekPublic {
+  names: [string, string | null];
+  stats: WeekStats;
+  hasImage: boolean;
+}
+
+export interface ChallengeQuestionCompare {
+  questionId: string;
+  text: string;
+  a: string;
+  b: string;
+  /** Выборы каждой пары: [первый, второй] либо null, пока пара не раскрыла. */
+  mine: [string, string] | null;
+  theirs: [string, string] | null;
+  mineMatch: boolean | null;
+  theirsMatch: boolean | null;
+  /** Все четверо выбрали одно и то же. */
+  allSame: boolean | null;
+}
+
+export interface ChallengeInfo {
+  code: string;
+  fromNames: [string, string | null];
+  questionsCount: number;
+  /** Я участник (отправитель или принявший). */
+  participant: boolean;
+  isSender: boolean;
+}
+
+export interface ChallengeCompare {
+  code: string;
+  myPairNames: [string, string | null];
+  otherPairNames: [string, string | null] | null;
+  isSender: boolean;
+  /** Мои раунды вызова, которые ещё надо пройти. */
+  rounds: RoundPublic[];
+  questions: ChallengeQuestionCompare[];
+  myDone: boolean;
+  theirsDone: boolean;
+  /** Сколько вопросов из N совпало у обеих пар. */
+  bothSame: number;
+}
+
+export interface MyChallenge {
+  code: string;
+  isSender: boolean;
+  fromNames: [string, string | null];
+  answered: number;
+  total: number;
+  otherJoined: boolean;
+}

@@ -6,6 +6,7 @@ import { useStore } from '../lib/store';
 import { choiceLabel, formatDate, formatDateTime, matchPercent, nDays, nDiscoveries } from '../lib/format';
 import { Button, Card, Heart, Label, Spinner } from '../components/ui';
 import { LevelBar } from '../components/LevelBar';
+import { Link } from 'react-router-dom';
 
 const MILESTONES = [10, 50, 100, 365];
 
@@ -70,6 +71,17 @@ export function History() {
         <LevelBar counters={c} />
       </div>
       {nextMilestone && <p className="-mt-2 mb-3 text-xs text-muted">Следующая веха: {nextMilestone} открытий, осталось {nextMilestone - c.discoveries}.</p>}
+
+      {me.partner && (
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <Link to="/week" className="rounded-2xl border border-line bg-surface px-4 py-3 text-center text-sm">
+            Итог недели
+          </Link>
+          <Link to="/challenge" className="rounded-2xl border border-line bg-surface px-4 py-3 text-center text-sm">
+            Вызвать пару
+          </Link>
+        </div>
+      )}
 
       <div className="mb-3 flex gap-2">
         <button className={`rounded-full px-4 py-2 text-sm ${!onlyFav ? 'bg-accent text-bg' : 'bg-surface-2 text-muted'}`} onClick={() => setOnlyFav(false)}>
