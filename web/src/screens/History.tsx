@@ -3,7 +3,7 @@ import type { HistoryItem } from '@polovinka/shared';
 import { GESTURE_LABELS } from '@polovinka/shared';
 import { api } from '../lib/api';
 import { useStore } from '../lib/store';
-import { choiceLabel, formatDate, formatDateTime, matchPercent, nDays, nDiscoveries } from '../lib/format';
+import { choiceLabel, formatDate, formatDateTime, guessHit, matchPercent, nDays, nDiscoveries } from '../lib/format';
 import { Button, Card, Heart, Label, Spinner } from '../components/ui';
 import { LevelBar } from '../components/LevelBar';
 import { Link } from 'react-router-dom';
@@ -39,7 +39,7 @@ export function History() {
   if (!me) return null;
   const c = me.counters;
   const partnerName = me.partner?.name ?? 'половинка';
-  const pct = matchPercent(c.matches, c.discoveries);
+  const pct = matchPercent(c.guessesRight, c.guessesTotal);
   const nextMilestone = MILESTONES.find((m) => m > c.discoveries);
 
   const toggleFav = async (it: HistoryItem) => {
@@ -132,6 +132,7 @@ export function History() {
             const q = r.question;
             const revealed = r.status === 'revealed' && r.partner;
             const same = revealed && r.mine && r.partner && r.mine.choice === r.partner.choice;
+            const bothGuessed = !!(revealed && r.mine && r.partner && guessHit(q.format, r.mine.guess, r.partner.choice) && guessHit(q.format, r.partner.guess, r.mine.choice));
             return (
               <div key={r.id}>
                 {header}
@@ -139,7 +140,7 @@ export function History() {
                   <div className="min-w-0 flex-1">
                     <div className="text-xs text-muted">
                       {r.kind === 'bonus' ? 'Бонус' : 'Вопрос дня'}
-                      {revealed ? (same ? ' · совпали' : ' · открытие') : ' · ждём ответа'}
+                      {revealed ? (same && bothGuessed ? ' · совпали и угадали' : bothGuessed ? ' · оба угадали' : same ? ' · выбрали одно' : ' · открытие') : ' · ждём ответа'}
                     </div>
                     <div className="mt-1 font-semibold leading-snug">{q.text}</div>
                     <div className="mt-2 space-y-1 text-sm">

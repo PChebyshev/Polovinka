@@ -103,21 +103,16 @@ export function Home() {
   };
 
   const c = me.counters;
-  const pct = matchPercent(c.matches, c.discoveries);
+  const pct = matchPercent(c.guessesRight, c.guessesTotal);
   const isSunday = new Date().getDay() === 0;
 
   return (
     <div className="mx-auto max-w-md px-4 pb-28 pt-4">
-      <header className="mb-4 flex items-end justify-between">
-        <div>
-          <div className="text-sm text-muted">{partner ? `${myName} и ${partner.name}` : myName}</div>
-          <h1 className="text-2xl font-bold">
-            {pct === null ? 'Половинка' : `Совпадаем на ${pct}%`}
-          </h1>
-        </div>
-        <div className="text-right text-xs text-muted">
-          <div>{nDiscoveries(c.discoveries)}</div>
-          <div>{nDays(c.daysTogether)} вместе в игре</div>
+      <header className="mb-4">
+        <div className="text-sm text-muted">{partner ? `${myName} и ${partner.name}` : myName}</div>
+        <h1 className="text-2xl font-bold">{pct === null ? 'Половинка' : `Совпадаем на ${pct}%`}</h1>
+        <div className="mt-1 text-xs text-muted">
+          {c.guessesTotal > 0 ? `угадали друг друга ${c.guessesRight} из ${c.guessesTotal}` : 'угадывайте выбор друг друга'} · {nDiscoveries(c.discoveries)} · {nDays(c.daysTogether)} в игре
         </div>
       </header>
       {partner && <LevelBar counters={c} />}

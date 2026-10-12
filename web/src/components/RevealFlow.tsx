@@ -3,6 +3,7 @@ import type { RoundPublic } from '@polovinka/shared';
 import { Button, Card, Chip, Confetti, Label } from './ui';
 import { api } from '../lib/api';
 import { buzz } from '../lib/share';
+import { guessHit } from '../lib/format';
 
 type Stage = 'flip' | 'result' | 'why' | 'topic' | 'done';
 
@@ -55,15 +56,30 @@ export function RevealFlow({
   const diff = (x: string | null, y: string | null) => (x === null || y === null ? 99 : Math.abs(Number(x) - Number(y)));
   const same = mine.choice === theirs.choice;
   const close = isScale && !same && diff(mine.choice, theirs.choice) === 1;
-  const iGuessed = mine.guess !== null && (isScale ? diff(mine.guess, theirs.choice) <= 1 : mine.guess === theirs.choice);
-  const theyGuessed = theirs.guess !== null && (isScale ? diff(theirs.guess, mine.choice) <= 1 : theirs.guess === mine.choice);
+  const iGuessed = guessHit(q.format, mine.guess, theirs.choice);
+  const theyGuessed = guessHit(q.format, theirs.guess, mine.choice);
+  const bothGuessed = iGuessed && theyGuessed;
+  const celebrate = same || bothGuessed;
+  const headline = same && bothGuessed ? 'Совпали и угадали!' : bothGuessed ? 'Оба угадали!' : same ? 'Совпали!' : close ? 'Почти совпали' : iGuessed || theyGuessed ? 'Почти поняли друг друга' : 'Новое открытие';
+  const sub =
+    same && bothGuessed
+      ? 'Выбрали одно и то же и знали это друг о друге.'
+      : bothGuessed
+        ? 'Вы выбрали разное — и точно знали это друг о друге.'
+        : same
+          ? 'Вы выбрали одно и то же. А угадать друг друга получится в следующий раз.'
+          : close
+            ? 'Разница в одно деление. Вы рядом.'
+            : iGuessed || theyGuessed
+              ? 'Один из вас угадал. Теперь вы оба знаете ответ.'
+              : 'Вы узнали друг о друге новое. Это и есть открытие.';
   const label = (c: string) => (isScale ? `${c} из 5` : c === 'a' ? q.a : q.b);
 
   useEffect(() => {
     if (stage !== 'flip') return;
     const t1 = window.setTimeout(() => setFlipped(true), 400);
     const t2 = window.setTimeout(() => {
-      buzz(same ? [20, 60, 20, 60, 40] : [20, 60, 20]);
+      buzz(celebrate ? [20, 60, 20, 60, 40] : [20, 60, 20]);
       remember(round.id, 'seen');
       setStage('result');
     }, 1300);
@@ -71,7 +87,7 @@ export function RevealFlow({
       window.clearTimeout(t1);
       window.clearTimeout(t2);
     };
-  }, [stage, same, round.id]);
+  }, [stage, celebrate, round.id]);
 
   const finish = () => {
     remember(round.id, 'done');
@@ -102,7 +118,7 @@ export function RevealFlow({
 
   return (
     <div className="space-y-4">
-      {stage === 'result' && same && <Confetti />}
+      {stage === 'result' && celebrate && <Confetti />}
 
       <Card className="rise">
         <div className="flex items-center justify-between">
@@ -121,7 +137,7 @@ export function RevealFlow({
                 <div className="text-xs text-muted">{name}</div>
                 <div className="mt-2 text-3xl">?</div>
               </div>
-              <div className={`flip-face flip-back flex h-full min-h-28 flex-col items-center justify-center rounded-2xl border p-3 text-center ${same ? 'border-sage/50 bg-sage/10' : 'border-accent/50 bg-accent/10'}`}>
+              <div className={`flip-face flip-back flex h-full min-h-28 flex-col items-center justify-center rounded-2xl border p-3 text-center ${celebrate ? 'border-sage/50 bg-sage/10' : 'border-accent/50 bg-accent/10'}`}>
                 <div className="text-xs text-muted">{name}</div>
                 <div className="mt-2 font-semibold leading-snug">{label(answer.choice)}</div>
               </div>
@@ -131,10 +147,8 @@ export function RevealFlow({
 
         {stage !== 'flip' && (
           <div className="mt-5 rise">
-            <div className={`text-2xl font-semibold ${same ? 'text-sage' : close ? 'text-sage' : 'text-sand'}`}>{same ? 'Совпали!' : close ? 'Почти совпали' : 'Новое открытие'}</div>
-            <p className="mt-1 text-muted">
-              {same ? 'Вы выбрали одно и то же. Так держать.' : close ? 'Разница в одно деление. Вы рядом.' : 'Вы узнали друг о друге новое. Это и есть открытие.'}
-            </p>
+            <div className={`text-2xl font-semibold ${celebrate || close ? 'text-sage' : 'text-sand'}`}>{headline}</div>
+            <p className="mt-1 text-muted">{sub}</p>
             {isScale && (
               <div className="mt-2 text-xs text-muted">
                 1 — {q.a} · 5 — {q.b}

@@ -22,13 +22,27 @@ function plural(n: number, one: string, few: string, many: string): string {
 }
 
 export function celebrationFor(key: string): Celebration {
-  const m = key.match(/^([dt])(\d+)$/);
+  const m = key.match(/^([dtl])(\d+)$/);
   const n = m ? Number(m[2]) : 0;
+  if (m?.[1] === 'l') {
+    const start = LEVELS[n - 1] ?? 0;
+    const next = LEVELS[n] ?? null;
+    return {
+      key,
+      title: `Уровень пары ${n}`,
+      subtitle:
+        next === null
+          ? `${start} ${plural(start, 'открытие', 'открытия', 'открытий')} друг о друге. Это высший уровень.`
+          : `${start} ${plural(start, 'открытие', 'открытия', 'открытий')} друг о друге. Полоска уровня начинается заново: до уровня ${n + 1} ещё ${next - start} ${plural(next - start, 'открытие', 'открытия', 'открытий')}.`,
+    };
+  }
   if (m?.[1] === 'd') {
     return {
       key,
       title: `${n} ${plural(n, 'открытие', 'открытия', 'открытий')} друг о друге`,
-      subtitle: n >= 100 ? 'Вы пишете свою историю, и она уже большая.' : 'Вы пишете свою историю. Каждый ответ — ещё одна строчка.',
+      subtitle:
+        (n >= 100 ? 'Вы пишете свою историю, и она уже большая.' : 'Вы пишете свою историю. Каждый ответ — ещё одна строчка.') +
+        (LEVELS.includes(n) ? ` Новый уровень пары: ${levelFor(n).level}.` : ''),
     };
   }
   return {
@@ -44,6 +58,12 @@ export function checkMilestones(pairId: string, discoveries: number, daysTogethe
   const fresh: string[] = [];
   for (const n of DISCOVERY_MILESTONES) if (discoveries >= n && !have.has(`d${n}`)) fresh.push(`d${n}`);
   for (const n of DAYS_MILESTONES) if (daysTogether >= n && !have.has(`t${n}`)) fresh.push(`t${n}`);
+  // Новый уровень пары. Если на том же пороге есть веха открытий, показываем только её.
+  const { level } = levelFor(discoveries);
+  for (let l = 2; l <= level; l++) {
+    const threshold = LEVELS[l - 1];
+    if (!have.has(`l${l}`) && !DISCOVERY_MILESTONES.includes(threshold)) fresh.push(`l${l}`);
+  }
   for (const key of fresh) run("INSERT OR IGNORE INTO milestones (pair_id, key, reached_at, seen_by) VALUES (?, ?, ?, '[]')", pairId, key, nowIso());
   return fresh;
 }

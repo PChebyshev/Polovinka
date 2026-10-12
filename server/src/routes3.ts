@@ -9,6 +9,7 @@ import { addDays, dateInTz, weekdayInTz } from './time.js';
 import { pickQuestion } from './selection.js';
 import { partnerOf, roundPublic } from './serialize.js';
 import { sendTo } from './sse.js';
+import { scoreFor, percent } from './score.js';
 
 const CHALLENGE_SIZE = 5;
 
@@ -30,29 +31,25 @@ export function weekBounds(tz: string, offset = 0): { start: string; end: string
 }
 
 export function weekStats(pairId: string, start: string, end: string): WeekStats {
-  const rounds = all<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date BETWEEN ? AND ? AND kind != 'challenge'`, pairId, start, end);
-  let discoveries = 0;
-  let matches = 0;
-  let guesses = 0;
-  const daysBoth = new Set<string>();
-  for (const r of rounds) {
-    const answers = all<AnswerRow>('SELECT * FROM answers WHERE round_id = ?', r.id);
-    if (answers.length >= 2) daysBoth.add(r.date);
-    if (r.status !== 'revealed' || answers.length < 2) continue;
-    discoveries++;
-    if (answers[0].choice === answers[1].choice) matches++;
-    if (answers[0].guess === answers[1].choice) guesses++;
-    if (answers[1].guess === answers[0].choice) guesses++;
-  }
+  const score = scoreFor(pairId, start, end);
+  const both = one<{ n: number }>(
+    `SELECT COUNT(DISTINCT r.date) AS n FROM rounds r
+      WHERE r.pair_id = ? AND r.kind != 'challenge' AND r.date BETWEEN ? AND ?
+        AND (SELECT COUNT(*) FROM answers a WHERE a.round_id = r.id) >= 2`,
+    pairId,
+    start,
+    end,
+  );
   const gestures = one<{ n: number }>(`SELECT COUNT(*) AS n FROM gestures WHERE pair_id = ? AND substr(created_at, 1, 10) BETWEEN ? AND ?`, pairId, start, end);
   return {
     weekStart: start,
     weekEnd: end,
-    discoveries,
-    matches,
-    matchPercent: discoveries ? Math.round((matches / discoveries) * 100) : null,
-    guessesRight: guesses,
-    daysBoth: daysBoth.size,
+    discoveries: score.discoveries,
+    matches: score.matches,
+    matchPercent: percent(score.guessesRight, score.guessesTotal),
+    guessesRight: score.guessesRight,
+    guessesTotal: score.guessesTotal,
+    daysBoth: Number(both?.n ?? 0),
     gestures: Number(gestures?.n ?? 0),
   };
 }

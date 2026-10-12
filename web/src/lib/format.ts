@@ -19,9 +19,17 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 }
 
-export function matchPercent(matches: number, discoveries: number): number | null {
-  if (discoveries === 0) return null;
-  return Math.round((matches / discoveries) * 100);
+/** Доля угаданных выборов партнёра — это и есть «Совпадаем на X%». */
+export function matchPercent(guessesRight: number, guessesTotal: number): number | null {
+  if (guessesTotal === 0) return null;
+  return Math.round((guessesRight / guessesTotal) * 100);
+}
+
+/** Угадал ли выбор партнёра. Для шкалы засчитываем ±1 деление (как на сервере). */
+export function guessHit(format: string, guess: string | null, actual: string | null | undefined): boolean {
+  if (guess === null || actual == null) return false;
+  if (format === 'scale') return Math.abs(Number(guess) - Number(actual)) <= 1;
+  return guess === actual;
 }
 
 export function formatDateTime(iso: string): string {

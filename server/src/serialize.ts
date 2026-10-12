@@ -2,6 +2,7 @@ import type { AnswerPublic, Counters, GesturePublic, Layer, PairPublic, Question
 import { renderText } from '../../shared/src/text.js';
 import { all, one, type AnswerRow, type GestureRow, type PairRow, type QuestionRow, type RoundRow, type UserRow } from './db.js';
 import { levelFor } from './levels.js';
+import { scoreFor } from './score.js';
 
 export const DEFAULT_WHY_CHIPS: Record<string, string[]> = {
   food: ['Просто вкуснее', 'Привычка с детства', 'Настроение такое', 'Так уютнее', 'Не могу объяснить, но да'],
@@ -104,31 +105,15 @@ export function roundPublic(round: RoundRow, viewer: UserRow, partner: UserRow |
 }
 
 export function counters(pairId: string): Counters {
-  const discoveries = one<{ n: number }>(`SELECT COUNT(*) AS n FROM rounds WHERE pair_id = ? AND status = 'revealed' AND kind != 'challenge'`, pairId);
-  const matches = one<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM rounds r
-      WHERE r.pair_id = ? AND r.status = 'revealed' AND r.kind != 'challenge'
-        AND (SELECT COUNT(DISTINCT choice) FROM answers WHERE round_id = r.id) = 1`,
-    pairId,
-  );
-  const guesses = one<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM answers a
-       JOIN rounds r ON r.id = a.round_id
-       JOIN answers p ON p.round_id = r.id AND p.user_id != a.user_id
-      WHERE r.pair_id = ? AND r.status = 'revealed' AND a.guess IS NOT NULL AND a.guess = p.choice`,
-    pairId,
-  );
+  const score = scoreFor(pairId);
   const days = one<{ n: number }>(
     `SELECT COUNT(DISTINCT r.date) AS n FROM rounds r JOIN answers a ON a.round_id = r.id WHERE r.pair_id = ?`,
     pairId,
   );
   const gestures = one<{ n: number }>('SELECT COUNT(*) AS n FROM gestures WHERE pair_id = ?', pairId);
-  const d = Number(discoveries?.n ?? 0);
   return {
-    ...levelFor(d),
-    discoveries: d,
-    matches: Number(matches?.n ?? 0),
-    guessesRight: Number(guesses?.n ?? 0),
+    ...levelFor(score.discoveries),
+    ...score,
     daysTogether: Number(days?.n ?? 0),
     gestures: Number(gestures?.n ?? 0),
   };

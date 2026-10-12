@@ -61,7 +61,9 @@ function categoryStats(pairId: string): Map<string, { revealed: number; missed: 
   const rows = all<{ category: string; revealed: number; missed: number }>(
     `SELECT q.category AS category,
             COUNT(DISTINCT r.id) AS revealed,
-            SUM(CASE WHEN a.guess IS NOT NULL AND a.guess != p.choice THEN 1 ELSE 0 END) AS missed
+            SUM(CASE WHEN a.guess IS NULL THEN 0
+                     WHEN q.format = 'scale' THEN (abs(CAST(a.guess AS INTEGER) - CAST(p.choice AS INTEGER)) > 1)
+                     ELSE a.guess != p.choice END) AS missed
        FROM rounds r
        JOIN questions q ON q.id = r.question_id
        JOIN answers a ON a.round_id = r.id

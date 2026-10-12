@@ -39,8 +39,11 @@ export interface PairPublic {
 
 export interface Counters {
   discoveries: number;
+  /** Раунды, где оба выбрали одно и то же. */
   matches: number;
+  /** Угаданные выборы партнёра — из них считается «Совпадаем на X%». */
   guessesRight: number;
+  guessesTotal: number;
   daysTogether: number;
   gestures: number;
   level: number;
@@ -217,8 +220,10 @@ export interface WeekStats {
   weekEnd: string;
   discoveries: number;
   matches: number;
+  /** Доля угаданных выборов партнёра за неделю. */
   matchPercent: number | null;
   guessesRight: number;
+  guessesTotal: number;
   daysBoth: number;
   gestures: number;
 }
