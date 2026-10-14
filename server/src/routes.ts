@@ -5,7 +5,7 @@ import { all, one, run, transaction, logEvent, type AnswerRow, type GestureRow, 
 import { hashToken, newCode, newId, newToken, nowIso } from './ids.js';
 import { requireUser, userByToken, readToken } from './auth.js';
 import { dateInTz, isValidTz } from './time.js';
-import { pickQuestion } from './selection.js';
+import { pickQuestion, ensureDaily } from './selection.js';
 import { counters, gesturePublic, pairPublic, partnerOf, roundPublic, userPublic } from './serialize.js';
 import { addClient, sendTo } from './sse.js';
 import { checkMilestones, unseenCelebrations } from './levels.js';
@@ -53,24 +53,6 @@ function createSoloPair(tz: string, guest = false): PairRow {
 
 function challengeByCodeRow(code: string) {
   return one<{ id: string; code: string; from_pair_id: string; question_ids: string; created_at: string; opened_count: number }>('SELECT * FROM challenges WHERE code = ?', code.trim().toLowerCase());
-}
-
-/** Создаёт раунд дня, если его ещё нет. Возвращает undefined, если вопросы кончились. */
-function ensureDaily(pair: PairRow, date: string): RoundRow | undefined {
-  const existing = one<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'daily'`, pair.id, date);
-  if (existing) return existing;
-  const members = one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE pair_id = ?', pair.id);
-  const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'daily', solo: Number(members?.n ?? 1) < 2, theme: pair.week_theme });
-  if (!q) return undefined;
-  run(
-    `INSERT OR IGNORE INTO rounds (id, pair_id, question_id, date, kind, status, created_at) VALUES (?, ?, ?, ?, 'daily', 'open', ?)`,
-    newId(),
-    pair.id,
-    q.id,
-    date,
-    nowIso(),
-  );
-  return one<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'daily'`, pair.id, date);
 }
 
 function meResponse(user: UserRow): MeResponse {

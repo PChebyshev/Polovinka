@@ -212,6 +212,41 @@ export function Stats() {
         </div>
       </Card>
 
+      <Card className="mt-3">
+        <Label>Уведомления</Label>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Tile n={String(data.push.subscriptions.reduce((s, x) => s + x.n, 0))} label="подписок" hint={data.push.subscriptions.map((x) => `${x.service}: ${x.n}`).join(', ') || 'нет'} />
+          <Tile n={String(data.push.sent)} label="доставлено сервису" />
+          <Tile n={String(data.push.failed)} label="отказов" />
+        </div>
+        {data.push.recent.length > 0 && (
+          <table className="mt-3 w-full text-xs tabular-nums">
+            <thead className="text-muted">
+              <tr>
+                <th className="text-left font-normal">Когда</th>
+                <th className="text-left font-normal">Что</th>
+                <th className="text-left font-normal">Куда</th>
+                <th className="text-right font-normal">Ответ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.push.recent.map((r, i) => (
+                <tr key={i} title={r.reason ?? ''}>
+                  <td>{new Date(r.at).toLocaleString('ru-RU', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                  <td>{({ morning: 'утро', evening: 'вечер', test: 'проверка' } as Record<string, string>)[r.kind] ?? r.kind}</td>
+                  <td>{r.service}</td>
+                  <td className={`text-right ${r.ok ? 'text-sage' : 'text-rose'}`}>
+                    {r.ok ? `✓ ${r.status}` : `✗ ${r.status || 'сеть'}`}
+                    {!r.ok && r.reason && <div className="max-w-[12rem] truncate text-muted">{r.reason}</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="mt-3 text-xs text-muted">«Доставлено сервису» значит, что Apple или Google приняли уведомление. Показ на телефоне дальше зависит от настроек телефона.</p>
+      </Card>
+
       <Card className="mt-3 space-y-4">
         <Label>По дням</Label>
         <Daily rows={data.daily} field="answers" label="Ответы" />

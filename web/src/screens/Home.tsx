@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { RoundPublic } from '@polovinka/shared';
 import { api, ApiError, clientId, QueuedError } from '../lib/api';
 import { InstallCard } from '../components/InstallCard';
+import { NotificationPrompt } from '../components/NotificationPrompt';
 import { useStore } from '../lib/store';
 import { formatDate, matchPercent, nDays, nDiscoveries } from '../lib/format';
 import { Button, Card, Label, Spinner } from '../components/ui';
@@ -121,6 +122,7 @@ export function Home() {
 
       <div className="space-y-4">
         <InstallCard />
+        {partner && <NotificationPrompt />}
 
         {me.unseenGestures.map((g) => (
           <GestureCard key={g.id} gesture={g} fromName={partner?.name ?? 'половинка'} onSeen={() => seenGesture(g.id)} />

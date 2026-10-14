@@ -95,10 +95,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
 
+  // Приложение на экране? Свёрнутое приложение не держит соединение: иначе сервер считает,
+  // что человек «в приложении», и не присылает push.
+  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
+  useEffect(() => {
+    const on = () => setVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', on);
+    window.addEventListener('pagehide', on);
+    window.addEventListener('pageshow', on);
+    return () => {
+      document.removeEventListener('visibilitychange', on);
+      window.removeEventListener('pagehide', on);
+      window.removeEventListener('pageshow', on);
+    };
+  }, []);
+
   // SSE: партнёр ответил, раскрытие, жест.
   useEffect(() => {
     const token = getToken();
-    if (!me || !token) return;
+    if (!me || !token || !visible) return;
     const es = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
     esRef.current = es;
     const handle = (ev: MessageEvent) => {
@@ -119,7 +134,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       es.close();
       esRef.current = null;
     };
-  }, [me?.user.id, refresh]);
+  }, [me?.user.id, refresh, visible]);
 
   const value = useMemo<Store>(
     () => ({

@@ -1,4 +1,5 @@
-import { all, one, type QuestionRow, type RoundRow } from './db.js';
+import { all, one, run, type PairRow, type QuestionRow, type RoundRow } from './db.js';
+import { newId, nowIso } from './ids.js';
 import { addDays, daysBetween, weekdayInTz } from './time.js';
 
 const RATIO: Record<string, number> = { light: 0.6, us: 0.25, deep: 0.15 };
@@ -147,4 +148,22 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
 
 export function roundsForDate(pairId: string, date: string): RoundRow[] {
   return all<RoundRow>('SELECT * FROM rounds WHERE pair_id = ? AND date = ? ORDER BY created_at', pairId, date);
+}
+
+/** Создаёт раунд дня, если его ещё нет. Возвращает undefined, если вопросы кончились. */
+export function ensureDaily(pair: PairRow, date: string): RoundRow | undefined {
+  const existing = one<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'daily'`, pair.id, date);
+  if (existing) return existing;
+  const members = one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE pair_id = ?', pair.id);
+  const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'daily', solo: Number(members?.n ?? 1) < 2, theme: pair.week_theme });
+  if (!q) return undefined;
+  run(
+    `INSERT OR IGNORE INTO rounds (id, pair_id, question_id, date, kind, status, created_at) VALUES (?, ?, ?, ?, 'daily', 'open', ?)`,
+    newId(),
+    pair.id,
+    q.id,
+    date,
+    nowIso(),
+  );
+  return one<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'daily'`, pair.id, date);
 }

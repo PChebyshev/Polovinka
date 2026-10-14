@@ -187,3 +187,16 @@ CREATE TABLE IF NOT EXISTS login_codes (
   used_at TEXT,
   created_at TEXT NOT NULL
 );
+
+-- Журнал отправки push: для диагностики на странице /stats. Без текстов и адресов подписок.
+CREATE TABLE IF NOT EXISTS push_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  service TEXT NOT NULL,
+  status INTEGER NOT NULL,
+  ok INTEGER NOT NULL,
+  reason TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_log_time ON push_log(created_at);

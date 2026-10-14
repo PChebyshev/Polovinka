@@ -1,7 +1,8 @@
 import webpush from 'web-push';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { all, one, run, type RoundRow, type UserRow } from './db.js';
+import { all, one, run, type PairRow, type UserRow } from './db.js';
+import { ensureDaily } from './selection.js';
 import { dateInTz } from './time.js';
 import { isOnline } from './sse.js';
 import { nowIso } from './ids.js';
@@ -24,6 +25,57 @@ export interface PushPayload {
 
 let publicKey = '';
 let enabled = false;
+let logger: { info: (s: string) => void; warn: (s: string) => void } = console;
+
+/** Сервис доставки по адресу подписки — без самого адреса. */
+function serviceOf(endpoint: string): string {
+  try {
+    const h = new URL(endpoint).hostname;
+    if (h.endsWith('push.apple.com')) return 'apple';
+    if (h.endsWith('googleapis.com')) return 'google';
+    if (h.includes('mozilla')) return 'mozilla';
+    if (h.includes('windows') || h.includes('microsoft')) return 'microsoft';
+    return h;
+  } catch {
+    return 'unknown';
+  }
+}
+
+function logPush(userId: string, kind: string, endpoint: string, status: number, ok: boolean, reason: string | null) {
+  run(
+    'INSERT INTO push_log (user_id, kind, service, status, ok, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    userId,
+    kind,
+    serviceOf(endpoint),
+    status,
+    ok ? 1 : 0,
+    reason ? reason.slice(0, 200) : null,
+    nowIso(),
+  );
+  // Журнал не растёт бесконечно.
+  run("DELETE FROM push_log WHERE created_at < datetime('now', '-30 days')");
+  if (!ok) logger.warn(`push ${kind} → ${serviceOf(endpoint)}: ${status} ${reason ?? ''}`);
+}
+
+function errInfo(e: unknown): { status: number; reason: string } {
+  const err = e as { statusCode?: number; body?: string; message?: string };
+  return { status: err.statusCode ?? 0, reason: (err.body || err.message || 'ошибка сети').toString().trim() };
+}
+
+/**
+ * Тема (subject) для VAPID. Apple отвергает адреса без настоящего домена,
+ * поэтому example.com, localhost и .local заменяем на адрес сайта.
+ */
+function vapidSubject(): string {
+  const site = (process.env.PUBLIC_URL ?? '').replace(/\/$/, '');
+  const raw = (process.env.VAPID_SUBJECT ?? '').trim();
+  const m = raw.match(/^mailto:([^\s<>@]+)@([^\s<>@]+\.[a-z]{2,})$/i);
+  const badDomain = m && /(^|\.)(example\.(com|org|net)|localhost|local)$/i.test(m[2]);
+  if (m && !badDomain) return `mailto:${m[1]}@${m[2]}`;
+  if (/^https:\/\/[^\s]+$/.test(raw)) return raw;
+  if (/^https:\/\/[^\s/]+\.[a-z]{2,}/i.test(site) && !/localhost/.test(site)) return site;
+  return 'https://polovinka.online';
+}
 
 /** Ключи VAPID: из окружения или из файла в каталоге данных (создаются один раз). */
 export function initPush(dataDir: string, log: { info: (s: string) => void; warn: (s: string) => void }) {
@@ -43,11 +95,13 @@ export function initPush(dataDir: string, log: { info: (s: string) => void; warn
       log.info('Сгенерированы VAPID-ключи для push: ' + file);
     }
   }
-  const subject = process.env.VAPID_SUBJECT ?? 'mailto:hello@polovinka.local';
+  logger = log;
+  const subject = vapidSubject();
   try {
     webpush.setVapidDetails(subject, pub, priv);
     publicKey = pub;
     enabled = true;
+    log.info(`Push включён, отправитель: ${subject}`);
   } catch (e) {
     log.warn('Push выключен: ' + (e as Error).message);
   }
@@ -81,11 +135,13 @@ export async function sendPush(user: UserRow, kind: 'morning' | 'evening', paylo
   let ok = false;
   for (const s of subs) {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600, urgency: 'normal' });
+      const res = await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600, urgency: 'normal' });
       if (s.failed_at) run('UPDATE push_subscriptions SET failed_at = NULL WHERE id = ?', s.id);
+      logPush(user.id, kind, s.endpoint, res.statusCode, true, null);
       ok = true;
     } catch (e) {
-      const status = (e as { statusCode?: number }).statusCode;
+      const { status, reason } = errInfo(e);
+      logPush(user.id, kind, s.endpoint, status, false, reason);
       if (status === 404 || status === 410) run('DELETE FROM push_subscriptions WHERE id = ?', s.id);
       else run('UPDATE push_subscriptions SET failed_at = ? WHERE id = ?', nowIso(), s.id);
     }
@@ -95,31 +151,35 @@ export async function sendPush(user: UserRow, kind: 'morning' | 'evening', paylo
 
 /** Пробное уведомление по кнопке в настройках: без дневного лимита, но не чаще раза в 30 секунд. */
 const lastTest = new Map<string, number>();
-export async function sendTestPush(user: UserRow): Promise<{ sent: number; failed: number; statuses: number[]; tooSoon?: boolean }> {
+export async function sendTestPush(user: UserRow): Promise<{ sent: number; failed: number; statuses: number[]; reasons: string[]; tooSoon?: boolean }> {
   const now = Date.now();
-  if (now - (lastTest.get(user.id) ?? 0) < 30_000) return { sent: 0, failed: 0, statuses: [], tooSoon: true };
+  if (now - (lastTest.get(user.id) ?? 0) < 30_000) return { sent: 0, failed: 0, statuses: [], reasons: [], tooSoon: true };
   lastTest.set(user.id, now);
   const subs = all<SubRow>('SELECT * FROM push_subscriptions WHERE user_id = ?', user.id);
   let sent = 0;
   let failed = 0;
   const statuses: number[] = [];
+  const reasons: string[] = [];
   for (const s of subs) {
     try {
-      await webpush.sendNotification(
+      const res = await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         JSON.stringify({ title: 'Половинка', body: 'Уведомления работают. Утром — вопрос, вечером — раскрытие.', url: '/settings', tag: 'test' }),
         { TTL: 600, urgency: 'high' },
       );
       if (s.failed_at) run('UPDATE push_subscriptions SET failed_at = NULL WHERE id = ?', s.id);
+      logPush(user.id, 'test', s.endpoint, res.statusCode, true, null);
       sent++;
     } catch (e) {
       failed++;
-      const status = (e as { statusCode?: number }).statusCode ?? 0;
+      const { status, reason } = errInfo(e);
       statuses.push(status);
+      reasons.push(reason.slice(0, 120));
+      logPush(user.id, 'test', s.endpoint, status, false, reason);
       if (status === 404 || status === 410) run('DELETE FROM push_subscriptions WHERE id = ?', s.id);
     }
   }
-  return { sent, failed, statuses };
+  return { sent, failed, statuses, reasons };
 }
 
 function hhmm(tz: string): string {
@@ -143,9 +203,13 @@ export async function tickSchedule() {
   for (const u of users) {
     const now = minutes(hhmm(u.tz));
     const date = dateInTz(u.tz);
-    const partner = one<UserRow>('SELECT * FROM users WHERE pair_id = ? AND id != ?', u.pair_id, u.id);
-    const daily = one<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'daily'`, u.pair_id, date);
     const inWindow = (t: string) => now >= minutes(t) && now < minutes(t) + 15;
+    if (!inWindow(u.notif_morning) && !inWindow(u.notif_evening)) continue;
+    const pair = one<PairRow>('SELECT * FROM pairs WHERE id = ?', u.pair_id);
+    if (!pair || pair.is_guest) continue;
+    const partner = one<UserRow>('SELECT * FROM users WHERE pair_id = ? AND id != ?', u.pair_id, u.id);
+    // Вопрос дня создаётся при первом открытии приложения. Утром его может ещё не быть — создаём сами.
+    const daily = ensureDaily(pair, dateInTz(pair.tz));
 
     if (inWindow(u.notif_morning)) {
       const answered = daily ? one('SELECT 1 FROM answers WHERE round_id = ? AND user_id = ?', daily.id, u.id) : null;

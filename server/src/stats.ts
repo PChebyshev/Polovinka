@@ -38,6 +38,12 @@ export interface StatsResponse {
     activePairs: number;
   };
   daily: Array<{ date: string; answers: number; reveals: number; gestures: number; users: number }>;
+  push: {
+    subscriptions: Array<{ service: string; n: number }>;
+    recent: Array<{ at: string; kind: string; service: string; status: number; ok: boolean; reason: string | null }>;
+    sent: number;
+    failed: number;
+  };
 }
 
 function count(type: string, since: string): number {
@@ -125,7 +131,30 @@ export function computeStats(periodDays = 30): StatsResponse {
     daily.push({ date: d, answers: ev('answer'), reveals: ev('reveal'), gestures: ev('gesture_sent'), users: u });
   }
 
+  const subsRows = all<{ endpoint: string }>('SELECT endpoint FROM push_subscriptions');
+  const bySvc = new Map<string, number>();
+  for (const r of subsRows) {
+    let svc = 'unknown';
+    try {
+      const h = new URL(r.endpoint).hostname;
+      svc = h.endsWith('push.apple.com') ? 'apple' : h.endsWith('googleapis.com') ? 'google' : h.includes('mozilla') ? 'mozilla' : h;
+    } catch {
+      /* пусто */
+    }
+    bySvc.set(svc, (bySvc.get(svc) ?? 0) + 1);
+  }
+  const recent = all<{ created_at: string; kind: string; service: string; status: number; ok: number; reason: string | null }>(
+    'SELECT * FROM push_log ORDER BY id DESC LIMIT 30',
+  ).map((r) => ({ at: r.created_at, kind: r.kind, service: r.service, status: r.status, ok: !!r.ok, reason: r.reason }));
+  const push = {
+    subscriptions: [...bySvc.entries()].map(([service, n]) => ({ service, n })),
+    recent,
+    sent: Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM push_log WHERE ok = 1 AND created_at >= ?', since)?.n ?? 0),
+    failed: Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM push_log WHERE ok = 0 AND created_at >= ?', since)?.n ?? 0),
+  };
+
   return {
+    push,
     generatedAt: new Date().toISOString(),
     periodDays,
     totals: { users, pairsComplete, pairsGuest, pairsSolo, pushSubscribed },

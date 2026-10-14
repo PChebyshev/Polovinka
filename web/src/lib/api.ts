@@ -136,7 +136,7 @@ export const api = {
   createHandoff: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes/handoff'),
   createLoginCode: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes'),
   redeemLoginCode: (code: string) => request<{ token: string; me: MeResponse }>('POST', '/api/login-codes/redeem', { code }),
-  pushTest: () => request<{ sent: number; failed: number; statuses: number[]; tooSoon?: boolean; disabled?: boolean }>('POST', '/api/push/test'),
+  pushTest: () => request<{ sent: number; failed: number; statuses: number[]; reasons?: string[]; tooSoon?: boolean; disabled?: boolean }>('POST', '/api/push/test'),
   stats: (key: string, days: number) => request<StatsResponse>('GET', `/api/stats?key=${encodeURIComponent(key)}&days=${days}`),
 };
 
@@ -166,4 +166,10 @@ export interface StatsResponse {
   kFactor: { sharesPerUser: number; conversion: number; k: number };
   closeness: { daysBothShare: number | null; revealsWithWhyShare: number | null; gesturesPerPairWeek: number | null; activePairs: number };
   daily: Array<{ date: string; answers: number; reveals: number; gestures: number; users: number }>;
+  push: {
+    subscriptions: Array<{ service: string; n: number }>;
+    recent: Array<{ at: string; kind: string; service: string; status: number; ok: boolean; reason: string | null }>;
+    sent: number;
+    failed: number;
+  };
 }
