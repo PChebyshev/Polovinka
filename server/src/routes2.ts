@@ -52,7 +52,8 @@ export async function registerStage2Routes(app: FastifyInstance, deps: Deps) {
   app.get('/api/history', { preHandler: requireUser }, async (req) => {
     const user = req.user!;
     const partner = partnerOf(user);
-    const q = req.query as { before?: string; limit?: string; favorites?: string };
+    const q = req.query as { before?: string; limit?: string; favorites?: string; only?: string };
+    const only = q.only === 'rounds' || q.only === 'gestures' ? q.only : null;
     const before = typeof q.before === 'string' && q.before ? q.before : '9999';
     const limit = Math.min(60, Math.max(5, Number(q.limit ?? 30) || 30));
     const onlyFav = q.favorites === '1';
@@ -65,6 +66,7 @@ export async function registerStage2Routes(app: FastifyInstance, deps: Deps) {
          UNION ALL
          SELECT 'gesture' AS kind, g.id AS id, g.created_at AS at FROM gestures g WHERE g.pair_id = ?
        ) WHERE at < ? ${onlyFav ? 'AND EXISTS (SELECT 1 FROM favorites f WHERE f.pair_id = ? AND f.ref_id = id)' : ''}
+         ${only === 'rounds' ? "AND kind = 'round'" : only === 'gestures' ? "AND kind = 'gesture'" : ''}
        ORDER BY at DESC LIMIT ?`,
       ...(onlyFav ? [user.pair_id, user.pair_id, before, user.pair_id, limit + 1] : [user.pair_id, user.pair_id, before, limit + 1]),
     );

@@ -36,9 +36,9 @@ function png(w, h, rgba) {
   ]);
 }
 
-const BG = [0x1b, 0x14, 0x12];
-const ACCENT = [0xe8, 0x87, 0x5f];
-const SAND = [0xf2, 0xcc, 0x8f];
+const BG = [0x17, 0x11, 0x1f];
+const ACCENT = [0xff, 0x7f, 0x9c];
+const SAND = [0xff, 0xc5, 0x9e];
 
 function mix(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
 function heart(x, y) {
@@ -63,7 +63,7 @@ function drawIcon(size, { maskable = false, radius = 0.22 } = {}) {
     }
     if (!inside) { buf[i + 3] = 0; continue; }
     const t = (x + y) / (2 * size);
-    let col = mix(mix(BG, [0x3a, 0x24, 0x1e], t), [0x2a, 0x1b, 0x18], 0.3);
+    let col = mix(mix(BG, [0x3a, 0x1f, 0x3d], t), [0x24, 0x17, 0x2b], 0.3);
     // сердце в центре
     const s = size * (0.5 - pad) * 0.82;
     const hx = (x - size / 2) / s * 1.25;
@@ -84,13 +84,13 @@ function drawOg(w, h) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = (y * w + x) * 4;
     const t = (x / w) * 0.6 + (y / h) * 0.4;
-    let col = mix(BG, [0x3a, 0x24, 0x1e], t);
+    let col = mix(BG, [0x3a, 0x1f, 0x3d], t);
     // два сердца: слева побольше, справа поменьше, слегка перекрываются
     const s1 = h * 0.33, s2 = h * 0.26;
     const h1 = heart(((x - w * 0.42) / s1) * 1.25, ((y - h * 0.5) / s1) * 1.25);
     const h2 = heart(((x - w * 0.6) / s2) * 1.25, ((y - h * 0.58) / s2) * 1.25);
     if (h1) col = mix(SAND, ACCENT, (y / h));
-    if (h2) col = mix([0xe2, 0x6d, 0x8a], ACCENT, (y / h));
+    if (h2) col = mix([0xb6, 0x9c, 0xff], ACCENT, (y / h));
     buf[i] = col[0]; buf[i + 1] = col[1]; buf[i + 2] = col[2]; buf[i + 3] = 255;
   }
   return png(w, h, buf);

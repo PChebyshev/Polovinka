@@ -8,6 +8,8 @@ import { addDays, dateInTz } from './time.js';
 import { levelFor } from './levels.js';
 import { scoreFor } from './score.js';
 import { topicsFor } from './progress.js';
+import { guessHit } from './score.js';
+import { weekdayInTz, daysBetween } from './time.js';
 import { partnerOf, roundPublic } from './serialize.js';
 import { sendTo } from './sse.js';
 
@@ -83,7 +85,84 @@ export function repeatAvailable(pair: PairRow): boolean {
   return !!repeatCandidate(pair.id, today);
 }
 
+const WEEKS = 12;
+
+/** Данные для страницы «Наша история»: недели, календарь ритуала, выводы по темам. */
+function insightsFor(user: UserRow) {
+  const pair = one<PairRow>('SELECT * FROM pairs WHERE id = ?', user.pair_id)!;
+  const today = dateInTz(pair.tz);
+  const monday = addDays(today, -((weekdayInTz(pair.tz) + 6) % 7));
+  const firstWeek = addDays(monday, -(WEEKS - 1) * 7);
+  const since = all<{ d: string }>(
+    `SELECT MIN(r.date) AS d FROM rounds r JOIN answers a ON a.round_id = r.id WHERE r.pair_id = ? AND r.kind != 'challenge'`,
+    pair.id,
+  )[0]?.d ?? null;
+
+  // Ответы по раскрытым раундам за 12 недель
+  const rows = all<{ round_id: string; date: string; format: string; user_id: string; choice: string; guess: string | null }>(
+    `SELECT r.id AS round_id, r.date, q.format, a.user_id, a.choice, a.guess
+       FROM rounds r JOIN questions q ON q.id = r.question_id JOIN answers a ON a.round_id = r.id
+      WHERE r.pair_id = ? AND r.kind != 'challenge' AND r.status = 'revealed' AND r.date >= ?`,
+    pair.id,
+    firstWeek,
+  );
+  const byRound = new Map<string, typeof rows>();
+  for (const r of rows) byRound.set(r.round_id, [...(byRound.get(r.round_id) ?? []), r]);
+  const weekly = Array.from({ length: WEEKS }, (_, i) => ({ weekStart: addDays(firstWeek, i * 7), discoveries: 0, right: 0, total: 0 }));
+  for (const list of byRound.values()) {
+    if (list.length < 2) continue;
+    const w = weekly[Math.floor(daysBetween(firstWeek, list[0].date) / 7)];
+    if (!w) continue;
+    w.discoveries++;
+    for (const [me, other] of [
+      [list[0], list[1]],
+      [list[1], list[0]],
+    ] as const) {
+      if (me.guess === null) continue;
+      w.total++;
+      if (guessHit(me.format, me.guess, other.choice)) w.right++;
+    }
+  }
+
+  // Календарь: по дням — ответили оба / один / никто
+  const answeredBy = new Map<string, Set<string>>();
+  for (const r of all<{ date: string; user_id: string }>(
+    `SELECT r.date, a.user_id FROM rounds r JOIN answers a ON a.round_id = r.id WHERE r.pair_id = ? AND r.kind != 'challenge' AND r.date >= ?`,
+    pair.id,
+    firstWeek,
+  )) {
+    const set = answeredBy.get(r.date) ?? new Set<string>();
+    set.add(r.user_id);
+    answeredBy.set(r.date, set);
+  }
+  const start = pair.created_at.slice(0, 10);
+  const calendar = Array.from({ length: WEEKS * 7 }, (_, i) => {
+    const date = addDays(firstWeek, i);
+    const n = answeredBy.get(date)?.size ?? 0;
+    const state = date > today ? 'future' : date < start && n === 0 ? 'before' : n >= 2 ? 'both' : n === 1 ? 'one' : 'none';
+    return { date, state };
+  });
+
+  // Выводы по темам
+  const level = levelFor(scoreFor(pair.id).discoveries).level;
+  const topics = topicsFor(pair.id, level).filter((t) => t.total >= 4);
+  const best = [...topics].sort((a, b) => b.right / b.total - a.right / a.total || b.total - a.total)[0] ?? null;
+  const discovery = [...topics].sort((a, b) => a.right / a.total - b.right / b.total || b.total - a.total)[0] ?? null;
+
+  const favorites = Number(one<{ n: number }>('SELECT COUNT(DISTINCT ref_id) AS n FROM favorites WHERE pair_id = ?', pair.id)?.n ?? 0);
+  return {
+    since,
+    weekly,
+    calendar,
+    bestTopic: best ? { key: best.key, label: best.label, right: best.right, total: best.total } : null,
+    discoveryTopic: discovery && discovery.key !== best?.key && discovery.right / discovery.total < 0.75 ? { key: discovery.key, label: discovery.label, right: discovery.right, total: discovery.total } : null,
+    favorites,
+  };
+}
+
 export async function registerStage5Routes(app: FastifyInstance) {
+  app.get('/api/insights', { preHandler: requireUser }, async (req) => insightsFor(req.user!));
+
   // --- Карта тем ---------------------------------------------------------------
   app.get('/api/topics', { preHandler: requireUser }, async (req) => {
     const user = req.user!;

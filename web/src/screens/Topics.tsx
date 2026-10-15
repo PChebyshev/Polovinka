@@ -14,7 +14,7 @@ function Badge({ on, title }: { on: boolean; title: string }) {
   );
 }
 
-export function Topics() {
+export function TopicsContent() {
   const { me, setMe } = useStore();
   const [data, setData] = useState<{ level: number; topics: TopicProgress[] } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -39,9 +39,8 @@ export function Topics() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-4 pb-28 pt-4">
-      <h1 className="text-2xl font-bold">Карта тем</h1>
-      <p className="mt-1 text-sm text-muted">
+    <div>
+      <p className="text-sm text-muted">
         В каждой теме два значка: «исследовали» — {EXPLORE_AT} раскрытых вопросов, и «знаем друг друга» — угадываете друг друга в трёх случаях из четырёх.
       </p>
       <Card tone="accent" className="mt-4">
@@ -100,6 +99,15 @@ export function Topics() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+export function Topics() {
+  return (
+    <div className="mx-auto max-w-md px-4 pb-28 pt-4">
+      <h1 className="mb-2 text-2xl font-bold">Карта тем</h1>
+      <TopicsContent />
     </div>
   );
 }

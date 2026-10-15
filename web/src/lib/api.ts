@@ -103,8 +103,8 @@ export const api = {
   gestureSeen: (id: string) => request<{ ok: true }>('POST', `/api/gestures/${id}/seen`),
   deleteHistory: () => request<{ ok: true }>('DELETE', '/api/pair/history'),
   // Этап 2
-  history: (before?: string | null, favorites = false) =>
-    request<HistoryResponse>('GET', `/api/history?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}${favorites ? '&favorites=1' : ''}`),
+  history: (before?: string | null, favorites = false, only?: 'rounds' | 'gestures') =>
+    request<HistoryResponse>('GET', `/api/history?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}${favorites ? '&favorites=1' : ''}${only ? `&only=${only}` : ''}`),
   toggleFavorite: (kind: 'round' | 'gesture', refId: string) => request<{ favorite: boolean }>('POST', '/api/favorites/toggle', { kind, refId }),
   milestoneSeen: (key: string) => request<{ ok: true }>('POST', `/api/milestones/${encodeURIComponent(key)}/seen`),
   skipRound: (roundId: string) => request<{ replaced: boolean; round: RoundPublic }>('POST', `/api/rounds/${roundId}/skip`),
@@ -134,6 +134,15 @@ export const api = {
   pushSubscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/api/push/subscribe', sub),
   pushUnsubscribe: (endpoint?: string) => request<{ ok: true }>('DELETE', '/api/push/subscribe', endpoint ? { endpoint } : {}),
   pushStatus: () => request<{ subscribed: boolean; endpoints: string[] }>('GET', '/api/push/status'),
+  insights: () =>
+    request<{
+      since: string | null;
+      weekly: Array<{ weekStart: string; discoveries: number; right: number; total: number }>;
+      calendar: Array<{ date: string; state: 'both' | 'one' | 'none' | 'before' | 'future' }>;
+      bestTopic: { key: string; label: string; right: number; total: number } | null;
+      discoveryTopic: { key: string; label: string; right: number; total: number } | null;
+      favorites: number;
+    }>('GET', '/api/insights'),
   topics: () => request<{ level: number; topics: TopicProgress[] }>('GET', '/api/topics'),
   repeat: () => request<RoundPublic>('POST', '/api/rounds/repeat'),
   capsules: () => request<{ prompts: string[]; capsules: CapsulePublic[]; level: number; days: number }>('GET', '/api/capsules'),

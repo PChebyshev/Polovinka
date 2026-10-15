@@ -33,37 +33,37 @@ export function drawWeekCard(canvas: HTMLCanvasElement, names: [string, string |
   const font = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
 
   const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#1b1412');
-  g.addColorStop(1, '#3a241e');
+  g.addColorStop(0, '#17111f');
+  g.addColorStop(1, '#3a1f3d');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
   // мягкие сердца на фоне
   ctx.globalAlpha = 0.08;
-  ctx.fillStyle = '#f2cc8f';
+  ctx.fillStyle = '#ffc59e';
   heart(ctx, 860, 140, 420);
-  ctx.fillStyle = '#e26d8a';
+  ctx.fillStyle = '#b69cff';
   heart(ctx, 220, 900, 520);
   ctx.globalAlpha = 1;
 
-  ctx.fillStyle = '#b89f93';
+  ctx.fillStyle = '#b8a5c4';
   ctx.font = `600 34px ${font}`;
   ctx.textBaseline = 'top';
   ctx.fillText('ПОЛОВИНКА  ·  ИТОГ НЕДЕЛИ', 80, 90);
   ctx.fillText(`${fmtDate(st.weekStart)} — ${fmtDate(st.weekEnd)}`.toUpperCase(), 80, 136);
 
   const title = names[1] ? `${names[0]} и ${names[1]}` : names[0];
-  ctx.fillStyle = '#f6ece4';
+  ctx.fillStyle = '#fbf0f6';
   ctx.font = `700 ${title.length > 18 ? 72 : 88}px ${font}`;
   ctx.fillText(title, 80, 220);
 
   // большая цифра: насколько пара знает друг друга; пока догадок мало — число открытий
   const pct = st.matchPercent;
   const showPct = pct !== null && pct > 0 && st.guessesTotal >= 4;
-  ctx.fillStyle = '#e8875f';
+  ctx.fillStyle = '#ff7f9c';
   ctx.font = `800 260px ${font}`;
   ctx.fillText(showPct ? `${pct}%` : String(st.discoveries), 80, 380);
-  ctx.fillStyle = '#f2cc8f';
+  ctx.fillStyle = '#ffc59e';
   ctx.font = `600 48px ${font}`;
   ctx.fillText(showPct ? 'знаем друг друга' : `${plural(st.discoveries, 'открытие', 'открытия', 'открытий')} друг о друге за неделю`, 80, 690);
 
@@ -80,21 +80,21 @@ export function drawWeekCard(canvas: HTMLCanvasElement, names: [string, string |
     ctx.beginPath();
     ctx.roundRect(x, y, 290, 220, 36);
     ctx.fill();
-    ctx.fillStyle = '#f6ece4';
+    ctx.fillStyle = '#fbf0f6';
     ctx.font = `800 96px ${font}`;
     ctx.fillText(n, x + 36, y + 30);
-    ctx.fillStyle = '#b89f93';
+    ctx.fillStyle = '#b8a5c4';
     ctx.font = `500 32px ${font}`;
     ctx.fillText(l, x + 36, y + 150);
   });
 
   // подпись
-  ctx.fillStyle = '#e8875f';
+  ctx.fillStyle = '#ff7f9c';
   heart(ctx, 118, 1150, 70);
-  ctx.fillStyle = '#f6ece4';
+  ctx.fillStyle = '#fbf0f6';
   ctx.font = `700 44px ${font}`;
   ctx.fillText('Половинка', 180, 1160);
-  ctx.fillStyle = '#b89f93';
+  ctx.fillStyle = '#b8a5c4';
   ctx.font = `500 34px ${font}`;
   ctx.fillText('один вопрос в день на двоих', 180, 1215);
   ctx.textAlign = 'right';

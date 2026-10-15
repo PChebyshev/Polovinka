@@ -13,7 +13,7 @@ export function Button({
     'inline-flex items-center justify-center gap-2 rounded-2xl font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 select-none';
   const size = big ? 'min-h-16 px-6 text-lg' : 'min-h-13 px-5 text-base';
   const look: Record<Variant, string> = {
-    primary: 'bg-accent text-bg shadow-[0_8px_24px_-8px_rgba(232,135,95,0.6)] hover:bg-accent-soft',
+    primary: 'bg-accent text-bg shadow-[0_8px_24px_-8px_rgba(255,127,156,0.5)] hover:bg-accent-soft',
     secondary: 'bg-surface-2 text-text border border-line hover:border-muted/50',
     ghost: 'bg-transparent text-muted hover:text-text',
     choice: 'bg-surface border-2 border-line text-text text-lg min-h-20 px-5 text-left leading-snug hover:border-accent/60',
@@ -76,7 +76,7 @@ export function Confetti({ count = 28 }: { count?: number }) {
         dx: `${(Math.random() - 0.5) * 120}px`,
         dur: `${2.2 + Math.random() * 1.6}s`,
         delay: `${Math.random() * 0.6}s`,
-        color: ['#e8875f', '#f2cc8f', '#8fbf9f', '#e26d8a', '#f6ece4'][i % 5],
+        color: ['#ff7f9c', '#ffc59e', '#b69cff', '#e879c6', '#fbf0f6'][i % 5],
         rotate: `${Math.random() * 90}deg`,
       })),
     [count],
