@@ -111,7 +111,7 @@ export function Home() {
     <div className="mx-auto max-w-md px-4 pb-28 pt-4">
       <header className="mb-4">
         <div className="text-sm text-muted">{partner ? `${myName} и ${partner.name}` : myName}</div>
-        <h1 className="text-2xl font-bold">{pct === null ? 'Половинка' : `Совпадаем на ${pct}%`}</h1>
+        <h1 className="text-2xl font-bold">{pct === null ? 'Половинка' : `Знаем друг друга на ${pct}%`}</h1>
         <div className="mt-1 text-xs text-muted">
           {c.guessesTotal > 0 ? `угадали друг друга ${c.guessesRight} из ${c.guessesTotal}` : 'угадывайте выбор друг друга'} · {nDiscoveries(c.discoveries)} · {nDays(c.daysTogether)} в игре
         </div>

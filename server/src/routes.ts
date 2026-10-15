@@ -12,7 +12,8 @@ import { checkMilestones, unseenCelebrations } from './levels.js';
 import { registerStage2Routes, gestureTemplatesOf } from './routes2.js';
 import { registerStage3Routes, joinChallenge, challengeOfRound, notifyChallenge, myChallenges } from './routes3.js';
 import { registerStage4Routes } from './routes4.js';
-import { pushReveal } from './push.js';
+import { pushReveal, pushPartnerAnswered } from './push.js';
+import { guessHit } from './score.js';
 
 const MAX_BONUS_PER_DAY = 3;
 const NAME_MAX = 24;
@@ -319,10 +320,18 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
       if (ch) notifyChallenge(ch);
       if (partner && round.kind === 'daily') {
         const theirs = one<AnswerRow>('SELECT * FROM answers WHERE round_id = ? AND user_id = ?', round.id, partner.id);
-        void pushReveal(partner, user.name, !!theirs && theirs.choice === choice);
+        // С точки зрения получателя (партнёра): угадал ли он меня, угадал ли я его.
+        void pushReveal(partner, user.name, {
+          iGuessed: !!theirs && guessHit(format, theirs.guess, choice),
+          theyGuessed: !!theirs && guessHit(format, guess, theirs.choice),
+        });
       }
     } else {
       sendTo(partner?.id, { type: 'partner_answered', roundId: round.id });
+      if (partner && round.kind === 'daily') {
+        const q = roundPublic(round, partner, user).question;
+        void pushPartnerAnswered(partner, user.name, q.text);
+      }
     }
     const fresh = one<RoundRow>('SELECT * FROM rounds WHERE id = ?', round.id)!;
     return roundPublic(fresh, user, partner);

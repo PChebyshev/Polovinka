@@ -246,13 +246,30 @@ export async function tickSchedule() {
 }
 
 /** Мгновенный push о раскрытии тому, кто не в приложении. Занимает вечерний слот. */
-export async function pushReveal(user: UserRow, partnerName: string, same: boolean) {
+export async function pushReveal(user: UserRow, partnerName: string, hits: { iGuessed: boolean; theyGuessed: boolean }) {
   if (isOnline(user.id)) return;
-  await sendPush(user, 'evening', {
-    title: same ? 'Совпали!' : 'Новое открытие',
-    body: same ? `Вы с ${partnerName} выбрали одно и то же.` : `Вы с ${partnerName} узнали друг о друге новое.`,
+  const body =
+    hits.iGuessed && hits.theyGuessed
+      ? `Вы с ${partnerName} угадали друг друга. Посмотрите.`
+      : hits.iGuessed
+        ? `Ваша догадка про ${partnerName} — в точку. А что выбрали вы — сюрприз.`
+        : hits.theyGuessed
+          ? `${partnerName} знает ваш ответ. Посмотрите, что выбрали вы оба.`
+          : `Вы узнали друг о друге новое. Посмотрите.`;
+  await sendPush(user, 'evening', { title: 'Раскрытие готово', body, url: '/', tag: 'evening' });
+}
+
+/**
+ * Партнёр ответил первым: зовём второго. Занимает утренний слот, чтобы в сумме
+ * оставалось не больше двух уведомлений в день; если утреннее уже ушло — молчим.
+ */
+export async function pushPartnerAnswered(user: UserRow, partnerName: string, questionText: string) {
+  if (isOnline(user.id)) return;
+  await sendPush(user, 'morning', {
+    title: `${partnerName} уже ответил(а)`,
+    body: `«${stripColon(questionText)}» — ваш ответ, и будет раскрытие. Это 20 секунд.`,
     url: '/',
-    tag: 'evening',
+    tag: 'morning',
   });
 }
 

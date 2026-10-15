@@ -58,7 +58,7 @@ export function History() {
       <div className="mt-4 grid grid-cols-3 gap-2">
         {[
           [nDiscoveries(c.discoveries).split(' ')[0], nDiscoveries(c.discoveries).split(' ')[1]],
-          [pct === null ? '—' : `${pct}%`, 'совпадений'],
+          [pct === null ? '—' : `${pct}%`, 'знаем друг друга'],
           [String(c.daysTogether), nDays(c.daysTogether).split(' ')[1] + ' в игре'],
         ].map(([n, l]) => (
           <div key={l} className="rounded-2xl border border-line bg-surface px-3 py-3 text-center">
@@ -132,7 +132,9 @@ export function History() {
             const q = r.question;
             const revealed = r.status === 'revealed' && r.partner;
             const same = revealed && r.mine && r.partner && r.mine.choice === r.partner.choice;
-            const bothGuessed = !!(revealed && r.mine && r.partner && guessHit(q.format, r.mine.guess, r.partner.choice) && guessHit(q.format, r.partner.guess, r.mine.choice));
+            const hitMine = !!(revealed && r.mine && r.partner && guessHit(q.format, r.mine.guess, r.partner.choice));
+            const hitTheirs = !!(revealed && r.mine && r.partner && guessHit(q.format, r.partner.guess, r.mine.choice));
+            const bothGuessed = hitMine && hitTheirs;
             return (
               <div key={r.id}>
                 {header}
@@ -140,7 +142,7 @@ export function History() {
                   <div className="min-w-0 flex-1">
                     <div className="text-xs text-muted">
                       {r.kind === 'bonus' ? 'Бонус' : 'Вопрос дня'}
-                      {revealed ? (same && bothGuessed ? ' · совпали и угадали' : bothGuessed ? ' · оба угадали' : same ? ' · выбрали одно' : ' · открытие') : ' · ждём ответа'}
+                      {revealed ? (bothGuessed ? ' · угадали друг друга' : hitMine ? ' · я угадал(а)' : hitTheirs ? ` · ${partnerName} угадал(а)` : ' · открытие') + (same ? ', выбрали одно' : '') : ' · ждём ответа'}
                     </div>
                     <div className="mt-1 font-semibold leading-snug">{q.text}</div>
                     <div className="mt-2 space-y-1 text-sm">

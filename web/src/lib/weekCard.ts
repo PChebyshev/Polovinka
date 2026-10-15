@@ -57,15 +57,15 @@ export function drawWeekCard(canvas: HTMLCanvasElement, names: [string, string |
   ctx.font = `700 ${title.length > 18 ? 72 : 88}px ${font}`;
   ctx.fillText(title, 80, 220);
 
-  // большая цифра: процент совпадений, а пока их мало — число открытий
+  // большая цифра: насколько пара знает друг друга; пока догадок мало — число открытий
   const pct = st.matchPercent;
-  const showPct = pct !== null && pct > 0 && st.discoveries >= 3;
+  const showPct = pct !== null && pct > 0 && st.guessesTotal >= 4;
   ctx.fillStyle = '#e8875f';
   ctx.font = `800 260px ${font}`;
   ctx.fillText(showPct ? `${pct}%` : String(st.discoveries), 80, 380);
   ctx.fillStyle = '#f2cc8f';
   ctx.font = `600 48px ${font}`;
-  ctx.fillText(showPct ? 'совпадений за неделю' : `${plural(st.discoveries, 'открытие', 'открытия', 'открытий')} друг о друге за неделю`, 80, 690);
+  ctx.fillText(showPct ? 'знаем друг друга' : `${plural(st.discoveries, 'открытие', 'открытия', 'открытий')} друг о друге за неделю`, 80, 690);
 
   // три плитки
   const tiles: Array<[string, string]> = [

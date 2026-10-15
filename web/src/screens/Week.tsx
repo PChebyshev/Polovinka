@@ -34,7 +34,7 @@ export function Week() {
   const url = `${location.origin}/w/${week.code}`;
   const title = week.names[1] ? `${week.names[0]} и ${week.names[1]}` : week.names[0];
   const d = week.stats.discoveries;
-  const text = `${title}: ${d} ${d % 10 === 1 && d % 100 !== 11 ? 'открытие' : d % 10 >= 2 && d % 10 <= 4 && (d % 100 < 10 || d % 100 >= 20) ? 'открытия' : 'открытий'} за неделю${week.stats.matchPercent ? `, совпали на ${week.stats.matchPercent}%` : ''}. Наш ритуал в Половинке: ${url}`;
+  const text = `${title}: ${d} ${d % 10 === 1 && d % 100 !== 11 ? 'открытие' : d % 10 >= 2 && d % 10 <= 4 && (d % 100 < 10 || d % 100 >= 20) ? 'открытия' : 'открытий'} за неделю${week.stats.matchPercent ? `, знаем друг друга на ${week.stats.matchPercent}%` : ''}. Наш ритуал в Половинке: ${url}`;
 
   const share = async () => {
     const canvas = canvasRef.current!;

@@ -59,20 +59,19 @@ export function RevealFlow({
   const iGuessed = guessHit(q.format, mine.guess, theirs.choice);
   const theyGuessed = guessHit(q.format, theirs.guess, mine.choice);
   const bothGuessed = iGuessed && theyGuessed;
-  const celebrate = same || bothGuessed;
-  const headline = same && bothGuessed ? 'Совпали и угадали!' : bothGuessed ? 'Оба угадали!' : same ? 'Совпали!' : close ? 'Почти совпали' : iGuessed || theyGuessed ? 'Почти поняли друг друга' : 'Новое открытие';
+  const oneGuessed = iGuessed !== theyGuessed;
+  // Праздник — когда угадали друг друга. Одинаковые ответы — приятная деталь, не результат.
+  const celebrate = bothGuessed;
+  const headline = bothGuessed ? 'Вы знаете друг друга!' : iGuessed ? 'Твоя догадка в точку' : theyGuessed ? `${partnerName} знает тебя` : 'Новое открытие';
+  const sameNote = same ? ' И выбрали одно и то же.' : close ? ' На шкале вы рядом.' : '';
   const sub =
-    same && bothGuessed
-      ? 'Выбрали одно и то же и знали это друг о друге.'
-      : bothGuessed
-        ? 'Вы выбрали разное — и точно знали это друг о друге.'
-        : same
-          ? 'Вы выбрали одно и то же. А угадать друг друга получится в следующий раз.'
-          : close
-            ? 'Разница в одно деление. Вы рядом.'
-            : iGuessed || theyGuessed
-              ? 'Один из вас угадал. Теперь вы оба знаете ответ.'
-              : 'Вы узнали друг о друге новое. Это и есть открытие.';
+    (bothGuessed
+      ? 'Оба угадали, что выберет другой.'
+      : iGuessed
+        ? `Ты знаешь, что выберет ${partnerName}. А вот твой ответ оказался сюрпризом.`
+        : theyGuessed
+          ? `${partnerName} угадывает тебя. Теперь и ты знаешь ответ.`
+          : 'Вы узнали друг о друге новое. Это и есть открытие.') + sameNote;
   const label = (c: string) => (isScale ? `${c} из 5` : c === 'a' ? q.a : q.b);
 
   useEffect(() => {
@@ -147,7 +146,7 @@ export function RevealFlow({
 
         {stage !== 'flip' && (
           <div className="mt-5 rise">
-            <div className={`text-2xl font-semibold ${celebrate || close ? 'text-sage' : 'text-sand'}`}>{headline}</div>
+            <div className={`text-2xl font-semibold ${celebrate || oneGuessed ? 'text-sage' : 'text-sand'}`}>{headline}</div>
             <p className="mt-1 text-muted">{sub}</p>
             {isScale && (
               <div className="mt-2 text-xs text-muted">

@@ -107,7 +107,7 @@ function ogFor(path: string, base: string): Og {
       const names = all<UserRow>('SELECT * FROM users WHERE pair_id = ? ORDER BY created_at', card.pair_id).map((u) => u.name);
       const st = JSON.parse(card.stats) as { discoveries: number; matchPercent: number | null };
       const title = names.length > 1 ? `${names[0]} и ${names[1]}` : names[0] ?? 'Пара';
-      const pct = st.matchPercent === null ? '' : `, совпали на ${st.matchPercent}%`;
+      const pct = st.matchPercent === null ? '' : `, знают друг друга на ${st.matchPercent}%`;
       return {
         title: `${title}: ${st.discoveries} ${plural(st.discoveries, 'открытие', 'открытия', 'открытий')} за неделю${pct}`,
         description: 'Один вопрос в день на двоих. Попробуйте свой ритуал в Половинке.',
@@ -122,7 +122,7 @@ function ogFor(path: string, base: string): Og {
     if (inviter) {
       return {
         title: `${inviter.name} зовёт тебя в Половинку`,
-        description: 'Один вопрос в день на двоих. Ответь, и узнаем, совпадёте ли вы.',
+        description: 'Один вопрос в день на двоих. Ответь — и узнаем, насколько хорошо вы знаете друг друга.',
         image: def.image,
       };
     }

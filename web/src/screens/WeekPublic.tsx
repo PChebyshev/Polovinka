@@ -32,10 +32,10 @@ export function WeekPublicScreen() {
           </div>
           <div className="mt-3 text-sm uppercase tracking-wider text-muted">Итог недели</div>
           <h1 className="mt-1 text-3xl font-bold">{title}</h1>
-          {w.stats.matchPercent !== null && w.stats.matchPercent > 0 && w.stats.discoveries >= 3 ? (
+          {w.stats.matchPercent !== null && w.stats.matchPercent > 0 && w.stats.guessesTotal >= 4 ? (
             <>
               <div className="mt-4 text-5xl font-extrabold text-accent">{w.stats.matchPercent}%</div>
-              <div className="text-muted">совпадений за неделю</div>
+              <div className="text-muted">знаем друг друга</div>
             </>
           ) : (
             <>
