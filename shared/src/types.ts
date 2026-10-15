@@ -199,7 +199,40 @@ export interface RoundPublic {
   partnerAnswered: boolean;
   /** Ответ партнёра, виден только после раскрытия. */
   partner: AnswerPublic | null;
+  /** Как ответили другие пары — только после раскрытия и если пар достаточно. */
+  crowd: CrowdStats | null;
 }
+
+/**
+ * Ответы других пар на тот же вопрос, без чьих-либо имён.
+ *  ab:    a — доля выбравших первый вариант, %
+ *  who:   a — доля назвавших себя, %
+ *  scale: avg — среднее от 1 до 5
+ */
+export interface CrowdStats {
+  people: number;
+  a: number;
+  avg: number | null;
+}
+
+export interface MemoryCard {
+  /** 30, 182 или 365 */
+  daysAgo: number;
+  round: RoundPublic;
+}
+
+export interface BookResponse {
+  names: string[];
+  since: string;
+  counters: Counters;
+  entries: BookEntry[];
+}
+
+export type BookEntry =
+  | { type: 'round'; at: string; round: RoundPublic }
+  | { type: 'gesture'; at: string; gesture: GesturePublic }
+  | { type: 'capsule'; at: string; capsule: CapsulePublic }
+  | { type: 'milestone'; at: string; key: string; title: string };
 
 export interface GesturePublic {
   id: string;

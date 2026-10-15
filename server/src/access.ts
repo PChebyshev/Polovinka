@@ -166,7 +166,13 @@ export function accessState(user: UserRow): AccessState {
 
 export async function registerAccessRoutes(app: FastifyInstance, deps: { meResponse: (u: UserRow) => unknown }) {
   /** Публичные настройки для экрана входа. */
-  app.get('/api/config', async () => ({ emailLogin: mailEnabled() }));
+  app.get('/api/config', async () => ({
+    emailLogin: mailEnabled(),
+    // Для страницы «Что мы храним»: где стоит сервер и как связаться. Задаются в .env.
+    dataLocation: process.env.DATA_LOCATION?.trim() || null,
+    contact: process.env.PRIVACY_CONTACT?.trim() || null,
+    operator: process.env.OPERATOR_NAME?.trim() || null,
+  }));
 
   // --- Код восстановления -------------------------------------------------------
 

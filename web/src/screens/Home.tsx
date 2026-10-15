@@ -5,6 +5,7 @@ import { InstallCard } from '../components/InstallCard';
 import { NotificationPrompt } from '../components/NotificationPrompt';
 import { AccessNudge } from '../components/AccessNudge';
 import { RecommendNudge } from '../components/RecommendNudge';
+import { MemoryCardBox } from '../components/MemoryCard';
 import { useStore } from '../lib/store';
 import { formatDate, matchPercent, nDays, nDiscoveries } from '../lib/format';
 import { Button, Card, Label, Spinner } from '../components/ui';
@@ -140,6 +141,7 @@ export function Home() {
         {partner && <NotificationPrompt />}
         {partner && <AccessNudge />}
         {partner && <RecommendNudge />}
+        {partner && <MemoryCardBox myName={myName} partnerName={partner.name} />}
 
         {me.capsule.unreadOpened && (
           <Link to="/capsule" className="block rounded-2xl border border-sand/50 bg-sand/10 px-4 py-3">

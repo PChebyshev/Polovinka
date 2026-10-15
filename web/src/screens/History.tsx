@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { HistoryItem } from '@polovinka/shared';
-import { CATEGORY_LABELS, GESTURE_LABELS } from '@polovinka/shared';
+import { CATEGORY_LABELS, GESTURE_LABELS, LEVEL_BOOK } from '@polovinka/shared';
 import { api } from '../lib/api';
 import { useStore } from '../lib/store';
 import { choiceLabel, guessHit, matchPercent, nDays, plural } from '../lib/format';
@@ -321,7 +321,11 @@ function Overview() {
           <Action to="/week" icon={Icon.week} title="Итог недели" hint="Карточка для сторис" />
           <Action to="/capsule" icon={Icon.capsule} title="Капсула времени" hint="Письма в будущее" />
           <Action to="/challenge" icon={Icon.duel} title="Вызвать пару" hint="5 вопросов друзьям" />
-          <Action to="/levels" icon={Icon.levels} title="Уровни" hint="Что откроется дальше" />
+          {c.level >= LEVEL_BOOK ? (
+            <Action to="/book" icon={Icon.levels} title="Книга пары" hint="Вся история одной книгой" />
+          ) : (
+            <Action to="/levels" icon={Icon.levels} title="Уровни" hint="Что откроется дальше" />
+          )}
         </div>
       )}
     </div>

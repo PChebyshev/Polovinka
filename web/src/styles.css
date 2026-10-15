@@ -111,3 +111,49 @@ button {
   .flip-card { transition-duration: 0.01s; }
   .breathe, .confetti { animation: none; }
 }
+
+/* Печать «Книги пары»: светлая бумага, без навигации, записи не рвутся между страницами */
+@page {
+  margin: 14mm 12mm;
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-2: #f7f1f4;
+    --color-line: #e6dbe1;
+    --color-text: #1d1420;
+    --color-muted: #6b5a70;
+    --color-accent: #c43d63;
+    --color-accent-soft: #c43d63;
+    --color-sand: #b0662e;
+    --color-lilac: #6f52c9;
+    --color-sage: #2f8a64;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #1d1420;
+  }
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  .book {
+    max-width: none;
+    padding: 0;
+  }
+  .book-cover {
+    break-after: page;
+    border: none;
+    background: none;
+  }
+  .book-entry {
+    break-inside: avoid;
+  }
+  .book-month h2 {
+    break-after: avoid;
+  }
+}

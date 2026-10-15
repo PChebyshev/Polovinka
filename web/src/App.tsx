@@ -6,6 +6,8 @@ import { Home } from './screens/Home';
 import { Join } from './screens/Join';
 import { Friend } from './screens/Friend';
 import { Recommend } from './screens/Recommend';
+import { Book } from './screens/Book';
+import { Privacy } from './screens/Privacy';
 import { Gesture } from './screens/Gesture';
 import { Settings } from './screens/Settings';
 import { History } from './screens/History';
@@ -163,7 +165,7 @@ function Shell() {
 
   if (!ready || handoff.pending) return <Spinner />;
   if (!me && handoff.failed) return <Onboarding handoffFailed />;
-  const publicPath = ['/j/', '/f/', '/w/', '/c/', '/stats'].some((p) => loc.pathname.startsWith(p));
+  const publicPath = ['/j/', '/f/', '/w/', '/c/', '/stats', '/privacy'].some((p) => loc.pathname.startsWith(p));
   if (!me && !publicPath) return <Onboarding />;
   return (
     <>
@@ -184,6 +186,8 @@ function Shell() {
         <Route path="/j/:code" element={<Join />} />
         <Route path="/f/:code" element={<Friend />} />
         <Route path="/recommend" element={<Recommend />} />
+        <Route path="/book" element={<Book />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="*" element={<Home />} />
       </Routes>
       <Nav />

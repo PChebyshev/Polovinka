@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, downloadExport } from '../lib/api';
 import { useStore } from '../lib/store';
 import { Button, Card, Label, Sheet } from '../components/ui';
 import { InviteCard } from '../components/InviteCard';
@@ -17,11 +17,20 @@ export function Settings() {
   const [name, setName] = useState(me?.user.name ?? '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [tplType, setTplType] = useState<'thanks' | 'thinking' | 'proud' | 'hug'>('thanks');
   const [tplText, setTplText] = useState('');
   if (!me) return null;
 
+  const exportHistory = async () => {
+    setExporting(true);
+    try {
+      await downloadExport();
+    } finally {
+      setExporting(false);
+    }
+  };
   const setTheme = async (theme: string | null) => setMe(await api.setTheme(theme));
   const addTemplate = async () => {
     if (!tplText.trim()) return;
@@ -193,8 +202,16 @@ export function Settings() {
 
       <Card className="mt-4">
         <Label>Приватность</Label>
-        <p className="mt-2 text-sm text-muted">Удаляет все вопросы, ответы и жесты вашей пары без возможности вернуть. Пара остаётся.</p>
-        <Button variant="secondary" className="mt-3 w-full" onClick={() => setConfirmDelete(true)}>
+        <p className="mt-2 text-sm text-muted">
+          Ваша история принадлежит вам: её можно скачать файлом или удалить у обоих.{' '}
+          <Link to="/privacy" className="text-accent">
+            Что мы храним
+          </Link>
+        </p>
+        <Button variant="secondary" className="mt-3 w-full" onClick={exportHistory} disabled={exporting}>
+          {exporting ? 'Собираем…' : 'Скачать нашу историю'}
+        </Button>
+        <Button variant="secondary" className="mt-2 w-full" onClick={() => setConfirmDelete(true)}>
           Удалить нашу историю
         </Button>
         <Button variant="ghost" className="mt-2 w-full" onClick={() => setConfirmLogout(true)}>

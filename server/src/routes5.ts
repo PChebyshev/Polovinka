@@ -13,7 +13,9 @@ import { weekdayInTz, daysBetween } from './time.js';
 import { partnerOf, roundPublic } from './serialize.js';
 import { sendTo } from './sse.js';
 
-const CAPSULE_DAYS = 30;
+/** Сроки капсул: месяц, полгода, год. */
+export const CAPSULE_TERMS = [30, 182, 365];
+const CAPSULE_MAX_ACTIVE = 3;
 const LETTER_MAX = 600;
 
 export const CAPSULE_PROMPTS = [
@@ -27,7 +29,7 @@ function pairLevel(pairId: string): number {
   return levelFor(scoreFor(pairId).discoveries).level;
 }
 
-function capsulePublic(row: { id: string; prompt: string; created_at: string; opens_at: string }): CapsulePublic {
+export function capsulePublic(row: { id: string; prompt: string; created_at: string; opens_at: string }): CapsulePublic {
   const opened = row.opens_at <= nowIso();
   const letters = all<{ user_id: string; text: string; created_at: string }>('SELECT * FROM capsule_letters WHERE capsule_id = ? ORDER BY created_at', row.id);
   return {
@@ -54,14 +56,16 @@ interface CapsuleRow {
 /** Состояние капсул для главной: активная, непрочитанная открытая, можно ли создать новую. */
 export function capsuleState(user: UserRow, level: number): MeResponse['capsule'] {
   const now = nowIso();
-  const active = one<CapsuleRow>('SELECT * FROM capsules WHERE pair_id = ? AND opens_at > ? ORDER BY created_at DESC LIMIT 1', user.pair_id, now);
+  const actives = all<CapsuleRow>('SELECT * FROM capsules WHERE pair_id = ? AND opens_at > ? ORDER BY opens_at', user.pair_id, now).map(capsulePublic);
+  // На главной — та, где моего письма ещё нет; иначе ближайшая
+  const active = actives.find((c) => !c.wroteIds.includes(user.id)) ?? actives[0] ?? null;
   const unread = all<CapsuleRow>('SELECT * FROM capsules WHERE pair_id = ? AND opens_at <= ? ORDER BY opens_at DESC', user.pair_id, now).find(
     (c) => !(JSON.parse(c.read_by) as string[]).includes(user.id),
   );
   return {
-    active: active ? capsulePublic(active) : null,
+    active,
     unreadOpened: unread ? capsulePublic(unread) : null,
-    canCreate: level >= LEVEL_CAPSULE && !active,
+    canCreate: level >= LEVEL_CAPSULE && actives.length < CAPSULE_MAX_ACTIVE,
   };
 }
 
@@ -201,19 +205,23 @@ export async function registerStage5Routes(app: FastifyInstance) {
   app.get('/api/capsules', { preHandler: requireUser }, async (req) => {
     const user = req.user!;
     const rows = all<CapsuleRow>('SELECT * FROM capsules WHERE pair_id = ? ORDER BY created_at DESC', user.pair_id);
-    return { prompts: CAPSULE_PROMPTS, capsules: rows.map(capsulePublic), level: pairLevel(user.pair_id), days: CAPSULE_DAYS };
+    const activeCount = rows.filter((r) => r.opens_at > nowIso()).length;
+    return { prompts: CAPSULE_PROMPTS, capsules: rows.map(capsulePublic), level: pairLevel(user.pair_id), terms: CAPSULE_TERMS, canCreate: activeCount < CAPSULE_MAX_ACTIVE };
   });
 
   app.post('/api/capsules', { preHandler: requireUser }, async (req, reply) => {
     const user = req.user!;
     if (pairLevel(user.pair_id) < LEVEL_CAPSULE) return reply.code(403).send({ error: 'level' });
-    if (one('SELECT 1 FROM capsules WHERE pair_id = ? AND opens_at > ?', user.pair_id, nowIso())) return reply.code(409).send({ error: 'active_exists' });
-    const raw = ((req.body ?? {}) as { prompt?: unknown }).prompt;
+    const activeCount = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM capsules WHERE pair_id = ? AND opens_at > ?', user.pair_id, nowIso())?.n ?? 0);
+    if (activeCount >= CAPSULE_MAX_ACTIVE) return reply.code(409).send({ error: 'active_exists' });
+    const body = (req.body ?? {}) as { prompt?: unknown; days?: unknown };
+    const raw = body.prompt;
+    const days = CAPSULE_TERMS.includes(Number(body.days)) ? Number(body.days) : CAPSULE_TERMS[0];
     const prompt = typeof raw === 'string' && raw.trim() ? raw.replace(/\s+/g, ' ').trim().slice(0, 120) : CAPSULE_PROMPTS[0];
     const id = newId();
-    const opens = new Date(Date.now() + CAPSULE_DAYS * 86_400_000).toISOString();
+    const opens = new Date(Date.now() + days * 86_400_000).toISOString();
     run('INSERT INTO capsules (id, pair_id, prompt, created_by, created_at, opens_at) VALUES (?, ?, ?, ?, ?, ?)', id, user.pair_id, prompt, user.id, nowIso(), opens);
-    logEvent('capsule_created', { pairId: user.pair_id, userId: user.id });
+    logEvent('capsule_created', { pairId: user.pair_id, userId: user.id, meta: { days } });
     sendTo(partnerOf(user)?.id, { type: 'pair_updated' });
     return capsulePublic(one<CapsuleRow>('SELECT * FROM capsules WHERE id = ?', id)!);
   });

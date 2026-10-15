@@ -35,6 +35,11 @@ export function Levels() {
                   <div className="mt-0.5 text-sm text-muted">
                     {l.level === 1 ? 'Начало: лёгкие и смешные вопросы.' : `${reached ? 'Открыто' : l.soon ? 'Готовим' : 'Откроет'}: ${l.unlock}.`}
                   </div>
+                  {reached && l.level === 6 && (
+                    <Link to="/book" className="mt-2 inline-block text-sm text-accent">
+                      Открыть книгу пары →
+                    </Link>
+                  )}
                   {reached && l.level === 3 && (
                     <Link to="/capsule" className="mt-2 inline-block text-sm text-accent">
                       Открыть капсулу времени →

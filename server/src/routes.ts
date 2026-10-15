@@ -17,6 +17,7 @@ import { registerStage3Routes, joinChallenge, challengeOfRound, notifyChallenge,
 import { registerStage4Routes } from './routes4.js';
 import { registerAccessRoutes, accessState } from './access.js';
 import { registerRecommendRoutes, refPair } from './recommend.js';
+import { registerMemoryRoutes } from './memories.js';
 import { pushReveal, pushPartnerAnswered } from './push.js';
 import { guessHit } from './score.js';
 
@@ -161,6 +162,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   await registerStage5Routes(app);
   await registerAccessRoutes(app, { meResponse });
   await registerRecommendRoutes(app);
+  await registerMemoryRoutes(app);
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };

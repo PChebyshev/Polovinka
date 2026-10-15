@@ -154,6 +154,8 @@ docker run --rm -v polovinka_app-data:/data -v /root:/backup alpine \
 | `VAPID_EMAIL` | контакт для push-сервисов |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | необязательно; задайте при переезде на другой сервер, чтобы не потерять push-подписки |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | необязательно; включают привязку почты и вход по коду из письма |
+| `DATA_LOCATION`, `OPERATOR_NAME`, `PRIVACY_CONTACT` | необязательно; показываются на странице «Что мы храним», см. `docs/LEGAL.md` |
+| `CROWD_MIN` | с какого числа ответов показывать «Как ответили другие пары», по умолчанию 20 |
 
 ## Вход по почте (необязательно)
 

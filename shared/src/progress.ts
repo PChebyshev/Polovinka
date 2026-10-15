@@ -17,7 +17,7 @@ export const LEVEL_INFO: LevelInfo[] = [
   { level: 3, at: 10, name: 'Команда', unlock: 'капсула времени' },
   { level: 4, at: 25, name: 'Близкие', unlock: 'набор «Наше будущее» и жест «Обнимаю»' },
   { level: 5, at: 50, name: 'Одна волна', unlock: '«Повтор»: старые вопросы возвращаются' },
-  { level: 6, at: 100, name: 'Родные души', unlock: '«Книга пары»', soon: true },
+  { level: 6, at: 100, name: 'Родные души', unlock: '«Книга пары»: вся ваша история одной книгой' },
   { level: 7, at: 200, name: 'Половинки', unlock: 'набор «Если бы мы встретились снова»' },
   { level: 8, at: 365, name: 'Легенда пары', unlock: 'годовой итог', soon: true },
 ];
@@ -25,6 +25,7 @@ export const LEVEL_INFO: LevelInfo[] = [
 export const LEVEL_CAPSULE = 3;
 export const LEVEL_HUG = 4;
 export const LEVEL_REPEAT = 5;
+export const LEVEL_BOOK = 6;
 
 export function levelName(level: number): string {
   return LEVEL_INFO[level - 1]?.name ?? '';

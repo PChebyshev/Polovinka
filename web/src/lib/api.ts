@@ -1,5 +1,5 @@
 import { enqueue } from './queue';
-import type { CapsulePublic, TopicProgress } from '@polovinka/shared';
+import type { BookResponse, CapsulePublic, MemoryCard, TopicProgress } from '@polovinka/shared';
 import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
@@ -148,14 +148,16 @@ export const api = {
     }>('GET', '/api/insights'),
   topics: () => request<{ level: number; topics: TopicProgress[] }>('GET', '/api/topics'),
   repeat: () => request<RoundPublic>('POST', '/api/rounds/repeat'),
-  capsules: () => request<{ prompts: string[]; capsules: CapsulePublic[]; level: number; days: number }>('GET', '/api/capsules'),
-  createCapsule: (prompt: string) => request<CapsulePublic>('POST', '/api/capsules', { prompt }),
+  capsules: () => request<{ prompts: string[]; capsules: CapsulePublic[]; level: number; terms: number[]; canCreate: boolean }>('GET', '/api/capsules'),
+  createCapsule: (prompt: string, days: number) => request<CapsulePublic>('POST', '/api/capsules', { prompt, days }),
+  memory: () => request<{ memory: MemoryCard | null }>('GET', '/api/memory'),
+  book: () => request<BookResponse>('GET', '/api/book'),
   writeCapsule: (id: string, text: string) => request<CapsulePublic>('POST', `/api/capsules/${id}/letter`, { text }),
   readCapsule: (id: string) => request<{ ok: true }>('POST', `/api/capsules/${id}/read`, {}),
   createHandoff: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes/handoff'),
   createLoginCode: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes'),
   redeemLoginCode: (code: string) => request<{ token: string; me: MeResponse }>('POST', '/api/login-codes/redeem', { code }),
-  config: () => request<{ emailLogin: boolean }>('GET', '/api/config'),
+  config: () => request<AppConfig>('GET', '/api/config'),
   createRecovery: () => request<{ phrase: string; createdAt: string }>('POST', '/api/recovery'),
   redeemRecovery: (phrase: string) => request<{ token: string; me: MeResponse }>('POST', '/api/recovery/redeem', { phrase }),
   revokeSessions: () => request<{ token: string; me: MeResponse }>('POST', '/api/sessions/revoke'),
@@ -167,6 +169,45 @@ export const api = {
   pushTest: () => request<{ sent: number; failed: number; statuses: number[]; reasons?: string[]; tooSoon?: boolean; disabled?: boolean }>('POST', '/api/push/test'),
   stats: (key: string, days: number) => request<StatsResponse>('GET', `/api/stats?key=${encodeURIComponent(key)}&days=${days}`),
 };
+
+export interface AppConfig {
+  emailLogin: boolean;
+  dataLocation: string | null;
+  contact: string | null;
+  operator: string | null;
+}
+
+/** Скачать всю историю пары файлом JSON. */
+export async function downloadExport(): Promise<'ok' | 'error'> {
+  const token = getToken();
+  try {
+    const res = await fetch('/api/export', { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) return 'error';
+    const blob = await res.blob();
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'polovinka.json';
+    const file = new File([blob], name, { type: 'application/json' });
+    // На телефоне удобнее системное меню «Сохранить в Файлы»
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Наша история · Половинка' });
+        return 'ok';
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return 'ok';
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return 'ok';
+  } catch {
+    return 'error';
+  }
+}
 
 function track(type: string): Promise<unknown> {
   return request('POST', '/api/events', { type }).catch(() => undefined);

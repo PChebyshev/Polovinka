@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { APP_NAME, APP_NAME_ACC } from '@polovinka/shared';
 import { api, ApiError } from '../lib/api';
 import { useStore } from '../lib/store';
@@ -9,6 +10,26 @@ import { isStandalone, shouldOfferInstall } from '../lib/install';
 type Mode = 'install' | 'name' | 'code' | 'recovery' | 'email';
 
 let landingLogged = false;
+
+/** Короткое обещание: чем Половинка отличается — работает без VPN и магазинов, без рекламы. */
+function OurPromise() {
+  const items = ['Работает в России без VPN и App Store', 'Без рекламы. Данные не продаём', 'Ответы видите только вы двое'];
+  return (
+    <div className="rise-3 mt-5">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted">
+        {items.map((t) => (
+          <li key={t} className="flex items-center gap-1.5">
+            <span className="text-sage">✓</span>
+            {t}
+          </li>
+        ))}
+      </ul>
+      <Link to="/privacy" className="mt-2 inline-block text-xs text-muted underline decoration-dotted">
+        Что мы храним
+      </Link>
+    </div>
+  );
+}
 
 /**
  * Первый экран (лендинг). На телефоне в браузере первым шагом — установка на экран «Домой»:
@@ -169,6 +190,7 @@ export function Onboarding({
       <h1 className="rise mt-5 text-4xl font-bold leading-tight">{APP_NAME}</h1>
       <p className="rise-2 mt-3 text-lg text-muted">{lead}</p>
       {context && (mode === 'install' || mode === 'name') && <div className="rise-3 mt-6">{context}</div>}
+      {(mode === 'install' || mode === 'name') && <OurPromise />}
 
       {mode === 'install' && (
         <div className="rise-3 mt-8">

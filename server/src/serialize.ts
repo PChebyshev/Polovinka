@@ -1,4 +1,4 @@
-import type { AnswerPublic, Counters, GesturePublic, Layer, PairPublic, QuestionFormat, RoundPublic, UserPublic } from '../../shared/src/types.js';
+import type { AnswerPublic, Counters, CrowdStats, GesturePublic, Layer, PairPublic, QuestionFormat, RoundPublic, UserPublic } from '../../shared/src/types.js';
 import { renderText } from '../../shared/src/text.js';
 import { all, one, type AnswerRow, type GestureRow, type PairRow, type QuestionRow, type RoundRow, type UserRow } from './db.js';
 import { levelFor } from './levels.js';
@@ -70,6 +70,35 @@ export function partnerOf(user: UserRow): UserRow | undefined {
   return one<UserRow>('SELECT * FROM users WHERE pair_id = ? AND id != ? LIMIT 1', user.pair_id, user.id);
 }
 
+/** Порог: показываем ответы других пар, только когда ответивших достаточно и никого нельзя узнать. */
+const CROWD_MIN = Number(process.env.CROWD_MIN ?? 20);
+const crowdCache = new Map<string, { at: number; v: CrowdStats | null }>();
+
+export function crowdFor(questionId: string, format: string, pairId: string): CrowdStats | null {
+  const key = `${questionId}:${pairId}`;
+  const hit = crowdCache.get(key);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.v;
+  const rows = all<{ choice: string; user_id: string }>(
+    `SELECT a.choice, a.user_id FROM answers a JOIN rounds r ON r.id = a.round_id
+     WHERE r.question_id = ? AND r.pair_id <> ? AND r.status = 'revealed' AND r.kind <> 'repeat'`,
+    questionId,
+    pairId,
+  );
+  let v: CrowdStats | null = null;
+  if (rows.length >= CROWD_MIN) {
+    if (format === 'scale') {
+      const nums = rows.map((r) => Number(r.choice)).filter((n) => n >= 1 && n <= 5);
+      v = { people: nums.length, a: 0, avg: nums.length ? Math.round((nums.reduce((x, y) => x + y, 0) / nums.length) * 10) / 10 : null };
+    } else {
+      const firstCount = format === 'who' ? rows.filter((r) => r.choice === r.user_id).length : rows.filter((r) => r.choice === 'a').length;
+      v = { people: rows.length, a: Math.round((firstCount / rows.length) * 100), avg: null };
+    }
+  }
+  if (crowdCache.size > 5000) crowdCache.clear();
+  crowdCache.set(key, { at: Date.now(), v });
+  return v;
+}
+
 export function roundPublic(round: RoundRow, viewer: UserRow, partner: UserRow | undefined): RoundPublic {
   const q = one<QuestionRow>('SELECT * FROM questions WHERE id = ?', round.question_id)!;
   const answers = all<AnswerRow>('SELECT * FROM answers WHERE round_id = ?', round.id);
@@ -110,6 +139,7 @@ export function roundPublic(round: RoundRow, viewer: UserRow, partner: UserRow |
     mine: mine ? answerPublic(mine, q.format, viewer.id) : null,
     partnerAnswered: !!theirs,
     partner: round.status === 'revealed' && theirs ? answerPublic(theirs, q.format, viewer.id) : null,
+    crowd: round.status === 'revealed' && !q.pair_id ? crowdFor(q.id, q.format, round.pair_id) : null,
   };
 }
 

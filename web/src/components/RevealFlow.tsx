@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { RoundPublic } from '@polovinka/shared';
+import type { CrowdStats, RoundPublic } from '@polovinka/shared';
 import { Button, Card, Chip, Confetti, Label } from './ui';
 import { api } from '../lib/api';
 import { buzz } from '../lib/share';
@@ -26,6 +26,38 @@ function remember(id: string, v: 'seen' | 'done') {
   } catch {
     /* пусто */
   }
+}
+
+/** Как ответили другие пары: одна полоса из двух частей, подписи — текстом, не цветом. */
+function CrowdLine({ crowd, format, a, b }: { crowd: CrowdStats; format: string; a: string; b: string }) {
+  if (format === 'scale') {
+    return (
+      <div className="mt-3 rounded-2xl border border-line px-4 py-3 text-sm">
+        <div className="text-xs text-muted">Другие пары · {crowd.people} ответов</div>
+        <div className="mt-1">В среднем {crowd.avg?.toLocaleString('ru-RU')} из 5</div>
+      </div>
+    );
+  }
+  const left = format === 'who' ? 'Назвали себя' : a;
+  const right = format === 'who' ? 'Назвали половинку' : b;
+  const pa = crowd.a;
+  return (
+    <div className="mt-3 rounded-2xl border border-line px-4 py-3 text-sm">
+      <div className="text-xs text-muted">Как ответили другие пары · {crowd.people} ответов</div>
+      <div className="mt-2 flex h-2 overflow-hidden rounded-full" aria-hidden>
+        <div className="bg-accent" style={{ width: `${pa}%` }} />
+        <div className="ml-0.5 flex-1 bg-lilac/70" />
+      </div>
+      <div className="mt-1.5 flex justify-between gap-3 text-xs">
+        <span>
+          <b>{pa}%</b> {left}
+        </span>
+        <span className="text-right">
+          <b>{100 - pa}%</b> {right}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function RevealFlow({
@@ -123,7 +155,7 @@ export function RevealFlow({
 
       <Card className="rise">
         <div className="flex items-center justify-between">
-          <Label>{(round.kind === 'bonus' ? 'Бонусный вопрос' : round.kind === 'repeat' ? 'Повтор: вопрос из прошлого' : 'Вопрос дня')}</Label>
+          <Label>{round.kind === 'bonus' ? 'Бонусный вопрос' : round.kind === 'repeat' ? 'Повтор: вопрос из прошлого' : 'Вопрос дня'}</Label>
           {q.isCustom && <Label>{q.authorName ? `Вопрос от: ${q.authorName}` : 'Ваш вопрос'}</Label>}
         </div>
         <h2 className="mt-2 text-xl font-semibold leading-tight">{q.text}</h2>
@@ -138,7 +170,9 @@ export function RevealFlow({
                 <div className="text-xs text-muted">{name}</div>
                 <div className="mt-2 text-3xl">?</div>
               </div>
-              <div className={`flip-face flip-back flex h-full min-h-28 flex-col items-center justify-center rounded-2xl border p-3 text-center ${celebrate ? 'border-sage/50 bg-sage/10' : 'border-accent/50 bg-accent/10'}`}>
+              <div
+                className={`flip-face flip-back flex h-full min-h-28 flex-col items-center justify-center rounded-2xl border p-3 text-center ${celebrate ? 'border-sage/50 bg-sage/10' : 'border-accent/50 bg-accent/10'}`}
+              >
                 <div className="text-xs text-muted">{name}</div>
                 <div className="mt-2 font-semibold leading-snug">{label(answer.choice)}</div>
               </div>
@@ -172,15 +206,25 @@ export function RevealFlow({
                 </div>
                 <div className="mt-1">
                   {myName}: {round.origin.mine ? label(round.origin.mine.choice) : '—'}
-                  {round.origin.mine && (round.origin.mine.choice === mine.choice ? <span className="text-muted"> · не изменилось</span> : <span className="text-sand"> · теперь иначе</span>)}
+                  {round.origin.mine &&
+                    (round.origin.mine.choice === mine.choice ? (
+                      <span className="text-muted"> · не изменилось</span>
+                    ) : (
+                      <span className="text-sand"> · теперь иначе</span>
+                    ))}
                 </div>
                 <div>
                   {partnerName}: {round.origin.partner ? label(round.origin.partner.choice) : '—'}
                   {round.origin.partner &&
-                    (round.origin.partner.choice === theirs.choice ? <span className="text-muted"> · не изменилось</span> : <span className="text-sand"> · теперь иначе</span>)}
+                    (round.origin.partner.choice === theirs.choice ? (
+                      <span className="text-muted"> · не изменилось</span>
+                    ) : (
+                      <span className="text-sand"> · теперь иначе</span>
+                    ))}
                 </div>
               </div>
             )}
+            {round.crowd && <CrowdLine crowd={round.crowd} format={q.format} a={q.a} b={q.b} />}
             {(whyOf(mine) || whyOf(theirs)) && (
               <div className="mt-3 space-y-1 rounded-2xl bg-surface-2 px-4 py-3 text-sm">
                 {whyOf(mine) && (

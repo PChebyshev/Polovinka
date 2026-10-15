@@ -18,6 +18,10 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      DATA_LOCATION: ${DATA_LOCATION:-}
+      PRIVACY_CONTACT: ${PRIVACY_CONTACT:-}
+      OPERATOR_NAME: ${OPERATOR_NAME:-}
+      CROWD_MIN: ${CROWD_MIN:-20}
     volumes:
       - app-data:/data
     expose:
