@@ -15,6 +15,7 @@ import { LEVEL_HUG } from '../../shared/src/progress.js';
 import { registerStage2Routes, gestureTemplatesOf } from './routes2.js';
 import { registerStage3Routes, joinChallenge, challengeOfRound, notifyChallenge, myChallenges } from './routes3.js';
 import { registerStage4Routes } from './routes4.js';
+import { registerAccessRoutes, accessState } from './access.js';
 import { pushReveal, pushPartnerAnswered } from './push.js';
 import { guessHit } from './score.js';
 
@@ -79,6 +80,7 @@ function meResponse(user: UserRow): MeResponse {
     streak: streakFor(pair),
     badges: badgesCount(pair.id),
     capsule: capsuleState(user, levelFor(c.discoveries).level),
+    access: accessState(user),
   };
 }
 
@@ -152,6 +154,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   await registerStage3Routes(app, { meResponse, dataDir: opts.dataDir });
   await registerStage4Routes(app, { meResponse });
   await registerStage5Routes(app);
+  await registerAccessRoutes(app, { meResponse });
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };

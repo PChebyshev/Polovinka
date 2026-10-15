@@ -6,7 +6,7 @@ import { Button, Card, Heart, Label } from '../components/ui';
 import { InstallGuide } from '../components/InstallGuide';
 import { isStandalone, shouldOfferInstall } from '../lib/install';
 
-type Mode = 'install' | 'name' | 'code';
+type Mode = 'install' | 'name' | 'code' | 'recovery' | 'email';
 
 let landingLogged = false;
 
@@ -34,13 +34,30 @@ export function Onboarding({
   const [mode, setMode] = useState<Mode>(handoffFailed ? 'code' : shouldOfferInstall() ? 'install' : 'name');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [phrase, setPhrase] = useState('');
+  const [email, setEmail] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailLogin, setEmailLogin] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(handoffFailed ? 'Автоматический вход не сработал. Введите код из Safari: Настройки → «Вход на другом устройстве».' : null);
+  const [error, setError] = useState<string | null>(
+    handoffFailed ? 'Автоматический вход не сработал. Введите код из Safari: Настройки → «Вход на другом устройстве».' : null,
+  );
+
+  useEffect(() => {
+    api
+      .config()
+      .then((c) => setEmailLogin(c.emailLogin))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (mode === 'install' && !landingLogged) {
       landingLogged = true;
-      void fetch('/api/events/anon', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'landing_install_shown' }) }).catch(() => undefined);
+      void fetch('/api/events/anon', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'landing_install_shown' }),
+      }).catch(() => undefined);
     }
   }, [mode]);
 
@@ -82,6 +99,52 @@ export function Onboarding({
     }
   };
 
+  const failMsg = (err: unknown, notFound: string) => {
+    if (err instanceof ApiError && err.code === 'too_many_attempts') setError('Слишком много попыток. Подождите 10 минут.');
+    else if (err instanceof ApiError && err.code === 'code_expired') setError('Код устарел. Запросите новый.');
+    else if (err instanceof ApiError && (err.status === 404 || err.status === 400)) setError(notFound);
+    else setError('Не получилось. Проверьте связь и попробуйте ещё раз.');
+  };
+
+  const submitPhrase = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!phrase.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.redeemRecovery(phrase);
+      login(r.token, r.me);
+      onDone?.();
+    } catch (err) {
+      failMsg(err, 'Код не подошёл. Проверьте слова и цифры — порядок важен.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    const em = email.trim();
+    if (!em.includes('@')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (!emailSent) {
+        await api.emailLogin(em);
+        setEmailSent(true);
+        setCode('');
+      } else {
+        const r = await api.emailLoginConfirm(em, code);
+        login(r.token, r.me);
+        onDone?.();
+      }
+    } catch (err) {
+      failMsg(err, emailSent ? 'Код не подошёл.' : 'Проверьте адрес.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const lead = intro ? (
     intro
   ) : inviterName ? (
@@ -113,7 +176,11 @@ export function Onboarding({
           <button
             className="mt-5 w-full py-2 text-center text-sm text-muted underline decoration-dotted"
             onClick={() => {
-              void fetch('/api/events/anon', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'landing_browser' }) }).catch(() => undefined);
+              void fetch('/api/events/anon', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ type: 'landing_browser' }),
+              }).catch(() => undefined);
               setMode('name');
             }}
           >
@@ -173,9 +240,139 @@ export function Onboarding({
           <Button type="submit" big className="w-full" disabled={busy || code.replace(/[^A-Za-z0-9]/g, '').length !== 6}>
             Войти
           </Button>
-          <button type="button" className="w-full text-center text-sm text-muted underline decoration-dotted" onClick={() => setMode('name')}>
-            Я здесь впервые
+          <div className="flex flex-col gap-3 text-center text-sm text-muted">
+            <button
+              type="button"
+              className="underline decoration-dotted"
+              onClick={() => {
+                setError(null);
+                setMode('recovery');
+              }}
+            >
+              У меня есть код восстановления
+            </button>
+            {emailLogin && (
+              <button
+                type="button"
+                className="underline decoration-dotted"
+                onClick={() => {
+                  setError(null);
+                  setMode('email');
+                }}
+              >
+                Войти по почте
+              </button>
+            )}
+            <button type="button" className="underline decoration-dotted" onClick={() => setMode('name')}>
+              Я здесь впервые
+            </button>
+          </div>
+        </form>
+      )}
+
+      {mode === 'recovery' && (
+        <form onSubmit={submitPhrase} className="rise-3 mt-8 space-y-4">
+          <p className="text-sm text-muted">Три слова и четыре цифры из «Настройки → Доступ и восстановление». Регистр и дефисы не важны.</p>
+          <input
+            className="w-full rounded-2xl border border-line bg-surface px-5 py-4 text-center text-lg outline-none focus:border-accent/60"
+            placeholder="слово-слово-слово-1234"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoFocus
+            value={phrase}
+            onChange={(e) => setPhrase(e.target.value)}
+          />
+          {error && <p className="text-sm text-rose">{error}</p>}
+          <Button
+            type="submit"
+            big
+            className="w-full"
+            disabled={
+              busy ||
+              phrase
+                .trim()
+                .split(/[^a-zA-Zа-яА-ЯёЁ0-9]+/)
+                .filter(Boolean).length < 4
+            }
+          >
+            Вернуть историю
+          </Button>
+          <button
+            type="button"
+            className="w-full text-center text-sm text-muted underline decoration-dotted"
+            onClick={() => {
+              setError(null);
+              setMode('code');
+            }}
+          >
+            Назад
           </button>
+        </form>
+      )}
+
+      {mode === 'email' && (
+        <form onSubmit={submitEmail} className="rise-3 mt-8 space-y-4">
+          {!emailSent ? (
+            <>
+              <p className="text-sm text-muted">Почта, которую вы привязали в настройках. Пришлём шестизначный код.</p>
+              <input
+                className="w-full rounded-2xl border border-line bg-surface px-5 py-4 text-lg outline-none focus:border-accent/60"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoCapitalize="off"
+                placeholder="вы@почта.ру"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted">
+                Если эта почта привязана, письмо с кодом уже в пути на <span className="text-text">{email.trim()}</span>. Код действует 15 минут.
+              </p>
+              <input
+                className="w-full rounded-2xl border border-line bg-surface px-5 py-4 text-center font-mono text-2xl tracking-[0.3em] outline-none focus:border-accent/60"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="000000"
+                maxLength={6}
+                autoFocus
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              />
+            </>
+          )}
+          {error && <p className="text-sm text-rose">{error}</p>}
+          <Button type="submit" big className="w-full" disabled={busy || (!emailSent ? !email.includes('@') : code.length !== 6)}>
+            {emailSent ? 'Войти' : 'Получить код'}
+          </Button>
+          <div className="flex flex-col gap-3 text-center text-sm text-muted">
+            {emailSent && (
+              <button
+                type="button"
+                className="underline decoration-dotted"
+                onClick={() => {
+                  setEmailSent(false);
+                  setError(null);
+                }}
+              >
+                Другая почта или отправить ещё раз
+              </button>
+            )}
+            <button
+              type="button"
+              className="underline decoration-dotted"
+              onClick={() => {
+                setError(null);
+                setMode('code');
+              }}
+            >
+              Назад
+            </button>
+          </div>
         </form>
       )}
     </div>

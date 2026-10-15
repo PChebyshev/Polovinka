@@ -3,6 +3,7 @@ import type { RoundPublic } from '@polovinka/shared';
 import { api, ApiError, clientId, QueuedError } from '../lib/api';
 import { InstallCard } from '../components/InstallCard';
 import { NotificationPrompt } from '../components/NotificationPrompt';
+import { AccessNudge } from '../components/AccessNudge';
 import { useStore } from '../lib/store';
 import { formatDate, matchPercent, nDays, nDiscoveries } from '../lib/format';
 import { Button, Card, Label, Spinner } from '../components/ui';
@@ -136,6 +137,7 @@ export function Home() {
       <div className="space-y-4">
         <InstallCard />
         {partner && <NotificationPrompt />}
+        {partner && <AccessNudge />}
 
         {me.capsule.unreadOpened && (
           <Link to="/capsule" className="block rounded-2xl border border-sand/50 bg-sand/10 px-4 py-3">

@@ -19,6 +19,10 @@ export interface UserRow {
   notif_enabled: number;
   last_seen_at: string | null;
   created_at: string;
+  recovery_hash?: string | null;
+  recovery_created_at?: string | null;
+  email?: string | null;
+  email_verified_at?: string | null;
 }
 
 export interface PairRow {
@@ -102,6 +106,13 @@ function migrate() {
   const has = (table: string, col: string) =>
     (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((c) => c.name === col);
   if (!has('rounds', 'origin_round_id')) db.exec('ALTER TABLE rounds ADD COLUMN origin_round_id TEXT');
+  // Доступ без пароля: код восстановления и почта
+  if (!has('users', 'recovery_hash')) db.exec('ALTER TABLE users ADD COLUMN recovery_hash TEXT');
+  if (!has('users', 'recovery_created_at')) db.exec('ALTER TABLE users ADD COLUMN recovery_created_at TEXT');
+  if (!has('users', 'email')) db.exec('ALTER TABLE users ADD COLUMN email TEXT');
+  if (!has('users', 'email_verified_at')) db.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email) WHERE email IS NOT NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS users_recovery ON users(recovery_hash) WHERE recovery_hash IS NOT NULL');
 }
 
 function findQuestionsJson(): string {

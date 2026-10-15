@@ -220,3 +220,17 @@ CREATE TABLE IF NOT EXISTS capsule_letters (
   created_at TEXT NOT NULL,
   PRIMARY KEY (capsule_id, user_id)
 );
+
+-- Коды из писем: привязка почты и вход по почте. Хранится хеш кода.
+CREATE TABLE IF NOT EXISTS email_codes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS email_codes_email ON email_codes(email, purpose);

@@ -7,6 +7,7 @@ import { CustomQuestions } from '../components/CustomQuestions';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { InstallCard } from '../components/InstallCard';
 import { LoginCodeBox } from '../components/LoginCode';
+import { EmailBox, RecoveryBox, RevokeBox } from '../components/Access';
 import { CATEGORY_LABELS, GESTURE_LABELS, LEVEL_HUG, isCategoryUnlocked } from '@polovinka/shared';
 import { Chip } from '../components/ui';
 
@@ -60,7 +61,12 @@ export function Settings() {
       <Card className="mt-4">
         <Label>Моё имя</Label>
         <div className="mt-2 flex gap-2">
-          <input className="min-w-0 flex-1 rounded-2xl border border-line bg-surface-2 px-4 py-3 outline-none focus:border-accent/60" maxLength={24} value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            className="min-w-0 flex-1 rounded-2xl border border-line bg-surface-2 px-4 py-3 outline-none focus:border-accent/60"
+            maxLength={24}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
           <Button variant="secondary" onClick={saveName} disabled={!name.trim() || name.trim() === me.user.name}>
             {saved ? '✓' : 'Сохранить'}
           </Button>
@@ -71,7 +77,11 @@ export function Settings() {
         <Label>Пара</Label>
         {me.partner ? (
           <p className="mt-2">
-            Ваша пара: <span className="font-semibold">{me.user.name} и {me.partner.name}</span>. Ответы видны только вам двоим.
+            Ваша пара:{' '}
+            <span className="font-semibold">
+              {me.user.name} и {me.partner.name}
+            </span>
+            . Ответы видны только вам двоим.
           </p>
         ) : (
           <p className="mt-2 text-muted">Половинка ещё не присоединилась.</p>
@@ -97,10 +107,10 @@ export function Settings() {
           {Object.entries(CATEGORY_LABELS)
             .filter(([k]) => isCategoryUnlocked(k, me.counters.level))
             .map(([k, label]) => (
-            <Chip key={k} active={me.weekTheme === k} onClick={() => setTheme(k)}>
-              {label}
-            </Chip>
-          ))}
+              <Chip key={k} active={me.weekTheme === k} onClick={() => setTheme(k)}>
+                {label}
+              </Chip>
+            ))}
         </div>
       </Card>
 
@@ -152,6 +162,18 @@ export function Settings() {
         <LoginCodeBox />
       </Card>
 
+      <Card className="mt-4">
+        <Label>Доступ и восстановление</Label>
+        <p className="mt-2 text-sm text-muted">
+          Аккаунт без пароля: вход хранится в этом телефоне. Чтобы не потерять историю при переустановке, оставьте себе способ вернуться.
+        </p>
+        <div className="mt-4 space-y-5">
+          <RecoveryBox />
+          <EmailBox />
+          <RevokeBox />
+        </div>
+      </Card>
+
       <div className="mt-4">
         <NotificationSettings />
       </div>
@@ -186,7 +208,11 @@ export function Settings() {
       </Sheet>
 
       <Sheet open={confirmLogout} onClose={() => setConfirmLogout(false)} title="Выйти с этого телефона?">
-        <p className="text-sm text-muted">Аккаунт без пароля. Вернуться можно по коду из «Вход на другом устройстве» на другом вашем устройстве, где вы уже вошли. Если такого нет, вернуться не получится.</p>
+        <p className="text-sm text-muted">
+          {me.access.hasRecovery || me.access.email
+            ? 'Вернуться можно по коду восстановления' + (me.access.email ? ', по почте' : '') + ' или по коду с другого вашего устройства.'
+            : 'У вас нет кода восстановления и почты. Вернуться получится только по коду с другого вашего устройства, где вы уже вошли. Лучше сначала создать код восстановления выше.'}
+        </p>
         <div className="mt-4 flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => setConfirmLogout(false)}>
             Остаться

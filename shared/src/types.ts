@@ -225,6 +225,16 @@ export interface MeResponse {
   streak: Streak;
   badges: number;
   capsule: { active: CapsulePublic | null; unreadOpened: CapsulePublic | null; canCreate: boolean };
+  /** Способы вернуть доступ: код восстановления и почта. */
+  access: AccessState;
+}
+
+export interface AccessState {
+  email: string | null;
+  /** На сервере настроена отправка писем. */
+  emailEnabled: boolean;
+  hasRecovery: boolean;
+  recoveryCreatedAt: string | null;
 }
 
 export interface TodayResponse {
