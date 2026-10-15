@@ -186,6 +186,19 @@ export function Stats() {
       </Card>
 
       <Card className="mt-3">
+        <Label>Совет друзьям</Label>
+        <div className="mt-3">
+          <Funnel
+            steps={[
+              ['Отправлено', f.refShared],
+              ['Открыто', f.refOpened],
+              ['Начали свою пару', f.refSignups],
+            ]}
+          />
+        </div>
+      </Card>
+
+      <Card className="mt-3">
         <Label>Установка на экран</Label>
         <div className="mt-3">
           <Funnel

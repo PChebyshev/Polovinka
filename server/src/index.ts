@@ -15,6 +15,7 @@ function plural(n: number, one: string, few: string, many: string): string {
 import { registerRoutes } from './routes.js';
 import { initPush, startScheduler } from './push.js';
 import { initMail } from './mail.js';
+import { refPair, refPreview } from './recommend.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8787);
@@ -41,7 +42,7 @@ await registerRoutes(app, { dataDir: DATA_DIR });
  * одноразовый код входа (/?h=…) должны попасть в него через start_url.
  */
 function startUrlFor(path: string, query: URLSearchParams): string {
-  const m = path.match(/^\/(j|c)\/([a-z0-9]{4,16})$/);
+  const m = path.match(/^\/(j|c|f)\/([a-z0-9]{4,16})$/);
   if (m) return `/${m[1]}/${m[2]}`;
   const h = query.get('h');
   if (path === '/install' && h && /^[A-Z0-9]{16}$/.test(h)) return `/?h=${h}`;
@@ -116,6 +117,11 @@ function ogFor(path: string, base: string): Og {
         image: card.png_path && existsSync(card.png_path) ? `${base}/api/week/${w[1]}/image.png` : def.image,
       };
     }
+  }
+  const f = path.match(/^\/f\/([a-z0-9]+)/);
+  if (f) {
+    const r = refPair(f[1]);
+    if (r) return { ...refPreview(r), image: def.image };
   }
   const m = path.match(/^\/j\/([a-z0-9]+)/);
   if (m) {

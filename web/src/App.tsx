@@ -4,6 +4,8 @@ import { useStore } from './lib/store';
 import { Onboarding } from './screens/Onboarding';
 import { Home } from './screens/Home';
 import { Join } from './screens/Join';
+import { Friend } from './screens/Friend';
+import { Recommend } from './screens/Recommend';
 import { Gesture } from './screens/Gesture';
 import { Settings } from './screens/Settings';
 import { History } from './screens/History';
@@ -26,7 +28,7 @@ import { api } from './lib/api';
 function Nav() {
   const { me } = useStore();
   const loc = useLocation();
-  if (!me || loc.pathname.startsWith('/j/') || loc.pathname.startsWith('/w/') || loc.pathname === '/stats') return null;
+  if (!me || loc.pathname.startsWith('/j/') || loc.pathname.startsWith('/f/') || loc.pathname.startsWith('/w/') || loc.pathname === '/stats') return null;
   const item = (to: string, label: string, icon: ReactElement) => (
     <NavLink
       to={to}
@@ -161,7 +163,7 @@ function Shell() {
 
   if (!ready || handoff.pending) return <Spinner />;
   if (!me && handoff.failed) return <Onboarding handoffFailed />;
-  const publicPath = ['/j/', '/w/', '/c/', '/stats'].some((p) => loc.pathname.startsWith(p));
+  const publicPath = ['/j/', '/f/', '/w/', '/c/', '/stats'].some((p) => loc.pathname.startsWith(p));
   if (!me && !publicPath) return <Onboarding />;
   return (
     <>
@@ -180,6 +182,8 @@ function Shell() {
         <Route path="/topics" element={<Topics />} />
         <Route path="/capsule" element={<Capsule />} />
         <Route path="/j/:code" element={<Join />} />
+        <Route path="/f/:code" element={<Friend />} />
+        <Route path="/recommend" element={<Recommend />} />
         <Route path="*" element={<Home />} />
       </Routes>
       <Nav />

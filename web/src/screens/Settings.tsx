@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useStore } from '../lib/store';
 import { Button, Card, Label, Sheet } from '../components/ui';
@@ -153,6 +154,14 @@ export function Settings() {
           </ul>
         )}
       </Card>
+
+      <Link to="/recommend" className="mt-4 flex items-center justify-between rounded-3xl border border-accent/30 bg-accent/10 px-5 py-4">
+        <span>
+          <span className="block font-semibold">Посоветовать друзьям</span>
+          <span className="block text-sm text-muted">Готовый текст и ссылка для другой пары</span>
+        </span>
+        <span className="text-muted">→</span>
+      </Link>
 
       <Card className="mt-4">
         <Label>Вход на другом устройстве</Label>

@@ -81,8 +81,11 @@ export function clientId(): string {
 }
 
 export const api = {
-  createUser: (name: string, joinCode?: string, challengeCode?: string) =>
-    request<{ token: string; me: MeResponse }>('POST', '/api/users', { name, tz: deviceTz(), joinCode, challengeCode }),
+  createUser: (name: string, joinCode?: string, challengeCode?: string, ref?: string) =>
+    request<{ token: string; me: MeResponse }>('POST', '/api/users', { name, tz: deviceTz(), joinCode, challengeCode, ref }),
+  recommend: () => request<{ code: string; url: string; host: string; image: string; title: string; description: string }>('GET', '/api/recommend'),
+  recommendSent: (via: string, variant: string) => request<{ ok: true }>('POST', '/api/recommend/sent', { via, variant }),
+  recommendInfo: (code: string) => request<{ names: string[]; days: number }>('GET', `/api/recommend/${encodeURIComponent(code)}`),
   me: () => request<MeResponse>('GET', '/api/me'),
   updateMe: (patch: { name?: string; notifMorning?: string; notifEvening?: string; notifEnabled?: boolean; tz?: string }) => request<MeResponse>('PUT', '/api/me', patch),
   invite: () => request<{ code: string; url: string; text: string }>('GET', '/api/invite'),
@@ -187,6 +190,9 @@ export interface StatsResponse {
     landingBrowser: number;
     standaloneLaunch: number;
     handoffRedeemed: number;
+    refShared: number;
+    refOpened: number;
+    refSignups: number;
   };
   kFactor: { sharesPerUser: number; conversion: number; k: number };
   closeness: { daysBothShare: number | null; revealsWithWhyShare: number | null; gesturesPerPairWeek: number | null; activePairs: number };

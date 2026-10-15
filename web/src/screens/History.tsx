@@ -301,6 +301,22 @@ function Overview() {
       )}
 
       {me.partner && (
+        <Link to="/recommend" className="flex items-center gap-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3">
+          <span className="text-accent">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+              <path d="M12 3v12M8 7l4-4 4 4" />
+            </svg>
+          </span>
+          <span className="flex-1">
+            <span className="block text-sm font-semibold">Посоветовать друзьям</span>
+            <span className="block text-xs text-muted">Готовый текст и ссылка для другой пары</span>
+          </span>
+          <span className="text-muted">→</span>
+        </Link>
+      )}
+
+      {me.partner && (
         <div className="grid grid-cols-2 gap-2">
           <Action to="/week" icon={Icon.week} title="Итог недели" hint="Карточка для сторис" />
           <Action to="/capsule" icon={Icon.capsule} title="Капсула времени" hint="Письма в будущее" />

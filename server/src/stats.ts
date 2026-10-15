@@ -75,11 +75,14 @@ export function computeStats(periodDays = 30): StatsResponse {
     landingBrowser: count('landing_browser', since),
     standaloneLaunch: count('standalone_launch', since),
     handoffRedeemed: count('handoff_redeemed', since) + count('login_code_redeemed', since),
+    refShared: count('ref_shared', since),
+    refOpened: count('ref_opened', since),
+    refSignups: count('ref_signup', since),
   };
 
   const usersInPeriod = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', since)?.n ?? 0) || users;
-  const shares = funnel.invitesSent + funnel.challengesSent + funnel.weeklyShared;
-  const converted = funnel.invitesAccepted + funnel.challengePairsCreated * 2;
+  const shares = funnel.invitesSent + funnel.challengesSent + funnel.weeklyShared + funnel.refShared;
+  const converted = funnel.invitesAccepted + funnel.challengePairsCreated * 2 + funnel.refSignups;
   const sharesPerUser = usersInPeriod ? shares / usersInPeriod : 0;
   const conversion = shares ? converted / shares : 0;
   const kFactor = { sharesPerUser: round(sharesPerUser), conversion: round(conversion), k: round(sharesPerUser * conversion) };

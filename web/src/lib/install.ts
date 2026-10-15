@@ -102,7 +102,7 @@ export function dismissInstall() {
 
 /** Адрес запуска установленного приложения — как на сервере (startUrlFor). */
 export function startUrlFor(pathname: string, search: string): string {
-  const m = pathname.match(/^\/(j|c)\/([a-z0-9]{4,16})$/);
+  const m = pathname.match(/^\/(j|c|f)\/([a-z0-9]{4,16})$/);
   if (m) return `/${m[1]}/${m[2]}`;
   const h = new URLSearchParams(search).get('h');
   if (pathname === '/install' && h && /^[A-Z0-9]{16}$/.test(h)) return `/?h=${h}`;

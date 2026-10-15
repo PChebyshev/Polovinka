@@ -112,6 +112,9 @@ function migrate() {
   if (!has('users', 'email')) db.exec('ALTER TABLE users ADD COLUMN email TEXT');
   if (!has('users', 'email_verified_at')) db.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email) WHERE email IS NOT NULL');
+  // Ссылка «посоветовать друзьям»: отдельный код, не путать с приглашением в пару
+  if (!has('pairs', 'ref_code')) db.exec('ALTER TABLE pairs ADD COLUMN ref_code TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS pairs_ref ON pairs(ref_code) WHERE ref_code IS NOT NULL');
   db.exec('CREATE INDEX IF NOT EXISTS users_recovery ON users(recovery_hash) WHERE recovery_hash IS NOT NULL');
 }
 

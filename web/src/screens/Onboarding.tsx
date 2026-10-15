@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { APP_NAME, APP_NAME_ACC } from '@polovinka/shared';
 import { api, ApiError } from '../lib/api';
 import { useStore } from '../lib/store';
@@ -22,6 +22,8 @@ export function Onboarding({
   intro,
   onDone,
   handoffFailed = false,
+  refCode,
+  context,
 }: {
   joinCode?: string;
   challengeCode?: string;
@@ -29,6 +31,10 @@ export function Onboarding({
   intro?: string;
   onDone?: () => void;
   handoffFailed?: boolean;
+  /** Код ссылки «посоветовать друзьям» — для статистики. */
+  refCode?: string;
+  /** Блок под заголовком: например, «Как это устроено» для пришедших по совету. */
+  context?: ReactNode;
 }) {
   const { login } = useStore();
   const [mode, setMode] = useState<Mode>(handoffFailed ? 'code' : shouldOfferInstall() ? 'install' : 'name');
@@ -68,7 +74,7 @@ export function Onboarding({
     setBusy(true);
     setError(null);
     try {
-      const r = await api.createUser(n, joinCode, challengeCode);
+      const r = await api.createUser(n, joinCode, challengeCode, refCode);
       login(r.token, r.me);
       onDone?.();
     } catch (err) {
@@ -162,6 +168,7 @@ export function Onboarding({
       </div>
       <h1 className="rise mt-5 text-4xl font-bold leading-tight">{APP_NAME}</h1>
       <p className="rise-2 mt-3 text-lg text-muted">{lead}</p>
+      {context && (mode === 'install' || mode === 'name') && <div className="rise-3 mt-6">{context}</div>}
 
       {mode === 'install' && (
         <div className="rise-3 mt-8">

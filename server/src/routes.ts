@@ -16,6 +16,7 @@ import { registerStage2Routes, gestureTemplatesOf } from './routes2.js';
 import { registerStage3Routes, joinChallenge, challengeOfRound, notifyChallenge, myChallenges } from './routes3.js';
 import { registerStage4Routes } from './routes4.js';
 import { registerAccessRoutes, accessState } from './access.js';
+import { registerRecommendRoutes, refPair } from './recommend.js';
 import { pushReveal, pushPartnerAnswered } from './push.js';
 import { guessHit } from './score.js';
 
@@ -99,7 +100,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   // --- Аккаунт -------------------------------------------------------------
 
   app.post('/api/users', async (req, reply) => {
-    const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; joinCode?: unknown; challengeCode?: unknown };
+    const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; joinCode?: unknown; challengeCode?: unknown; ref?: unknown };
     const name = cleanName(body.name);
     if (!name) return reply.code(400).send({ error: 'name' });
     const tz = isValidTz(body.tz) ? body.tz : 'Europe/Moscow';
@@ -135,6 +136,10 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
       ts,
     );
     logEvent('user_created', { pairId: pair.id, userId: id, meta: { joined } });
+    if (!joined && typeof body.ref === 'string') {
+      const from = refPair(body.ref.trim().toLowerCase());
+      if (from && from.pair.id !== pair.id) logEvent('ref_signup', { pairId: pair.id, userId: id, meta: { from: from.pair.id } });
+    }
     const user = one<UserRow>('SELECT * FROM users WHERE id = ?', id)!;
     if (challenge) {
       joinChallenge(challenge, pair);
@@ -155,6 +160,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   await registerStage4Routes(app, { meResponse });
   await registerStage5Routes(app);
   await registerAccessRoutes(app, { meResponse });
+  await registerRecommendRoutes(app);
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };
