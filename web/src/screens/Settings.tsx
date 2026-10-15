@@ -7,7 +7,7 @@ import { CustomQuestions } from '../components/CustomQuestions';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { InstallCard } from '../components/InstallCard';
 import { LoginCodeBox } from '../components/LoginCode';
-import { CATEGORY_LABELS, GESTURE_LABELS } from '@polovinka/shared';
+import { CATEGORY_LABELS, GESTURE_LABELS, LEVEL_HUG, isCategoryUnlocked } from '@polovinka/shared';
 import { Chip } from '../components/ui';
 
 export function Settings() {
@@ -16,7 +16,7 @@ export function Settings() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tplType, setTplType] = useState<'thanks' | 'thinking' | 'proud'>('thanks');
+  const [tplType, setTplType] = useState<'thanks' | 'thinking' | 'proud' | 'hug'>('thanks');
   const [tplText, setTplText] = useState('');
   if (!me) return null;
 
@@ -94,7 +94,9 @@ export function Settings() {
           <Chip active={!me.weekTheme} onClick={() => setTheme(null)}>
             Без темы
           </Chip>
-          {Object.entries(CATEGORY_LABELS).map(([k, label]) => (
+          {Object.entries(CATEGORY_LABELS)
+            .filter(([k]) => isCategoryUnlocked(k, me.counters.level))
+            .map(([k, label]) => (
             <Chip key={k} active={me.weekTheme === k} onClick={() => setTheme(k)}>
               {label}
             </Chip>
@@ -106,7 +108,7 @@ export function Settings() {
         <Label>Свои шаблоны жестов</Label>
         <p className="mt-2 text-sm text-muted">Появятся чипами на экране жеста у обоих.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {(['thanks', 'thinking', 'proud'] as const).map((t) => (
+          {(me.counters.level >= LEVEL_HUG ? (['thanks', 'thinking', 'proud', 'hug'] as const) : (['thanks', 'thinking', 'proud'] as const)).map((t) => (
             <Chip key={t} active={tplType === t} onClick={() => setTplType(t)}>
               {GESTURE_LABELS[t]}
             </Chip>

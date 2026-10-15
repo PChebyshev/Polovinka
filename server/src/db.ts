@@ -54,6 +54,7 @@ export interface RoundRow {
   date: string;
   kind: string;
   challenge_id: string | null;
+  origin_round_id?: string | null;
   status: string;
   revealed_at: string | null;
   created_at: string;
@@ -91,8 +92,16 @@ export function openDb(dataDir: string): DatabaseSync {
   const schemaPath = [join(here, 'schema.sql'), join(here, '..', 'src', 'schema.sql')].find((p) => existsSync(p));
   if (!schemaPath) throw new Error('schema.sql не найден');
   db.exec(readFileSync(schemaPath, 'utf8'));
+  migrate();
   seedQuestions();
   return db;
+}
+
+/** Добавление колонок в существующие таблицы (CREATE TABLE IF NOT EXISTS их не трогает). */
+function migrate() {
+  const has = (table: string, col: string) =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((c) => c.name === col);
+  if (!has('rounds', 'origin_round_id')) db.exec('ALTER TABLE rounds ADD COLUMN origin_round_id TEXT');
 }
 
 function findQuestionsJson(): string {

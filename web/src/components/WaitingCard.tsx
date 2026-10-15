@@ -27,7 +27,7 @@ export function WaitingCard({ round, partnerName }: { round: RoundPublic; partne
 
   return (
     <Card className="rise">
-      <Label>{round.kind === 'bonus' ? 'Бонусный вопрос' : 'Вопрос дня'}</Label>
+      <Label>{(round.kind === 'bonus' ? 'Бонусный вопрос' : round.kind === 'repeat' ? 'Повтор: вопрос из прошлого' : 'Вопрос дня')}</Label>
       <h2 className="mt-2 text-xl font-semibold leading-tight">{q.text}</h2>
       <div className="mt-4 rounded-2xl bg-surface-2 px-4 py-3 text-sm">
         <div>

@@ -73,6 +73,16 @@ export function History() {
       {nextMilestone && <p className="-mt-2 mb-3 text-xs text-muted">Следующая веха: {nextMilestone} открытий, осталось {nextMilestone - c.discoveries}.</p>}
 
       {me.partner && (
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <Link to="/topics" className="rounded-2xl border border-line bg-surface px-4 py-3 text-center text-sm">
+            Карта тем · {me.badges} {me.badges === 1 ? 'значок' : me.badges >= 2 && me.badges <= 4 ? 'значка' : 'значков'}
+          </Link>
+          <Link to="/capsule" className="rounded-2xl border border-line bg-surface px-4 py-3 text-center text-sm">
+            Капсула времени
+          </Link>
+        </div>
+      )}
+      {me.partner && (
         <div className="mb-4 grid grid-cols-2 gap-2">
           <Link to="/week" className="rounded-2xl border border-line bg-surface px-4 py-3 text-center text-sm">
             Итог недели
@@ -141,7 +151,7 @@ export function History() {
                 <Card className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-xs text-muted">
-                      {r.kind === 'bonus' ? 'Бонус' : 'Вопрос дня'}
+                      {r.kind === 'bonus' ? 'Бонус' : r.kind === 'repeat' ? 'Повтор' : 'Вопрос дня'}
                       {revealed ? (bothGuessed ? ' · угадали друг друга' : hitMine ? ' · я угадал(а)' : hitTheirs ? ` · ${partnerName} угадал(а)` : ' · открытие') + (same ? ', выбрали одно' : '') : ' · ждём ответа'}
                     </div>
                     <div className="mt-1 font-semibold leading-snug">{q.text}</div>

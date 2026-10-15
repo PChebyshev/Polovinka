@@ -13,6 +13,9 @@ import { Challenge } from './screens/Challenge';
 import { NewChallenge } from './screens/NewChallenge';
 import { Stats } from './screens/Stats';
 import { Install } from './screens/Install';
+import { Levels } from './screens/Levels';
+import { Topics } from './screens/Topics';
+import { Capsule } from './screens/Capsule';
 import { isStandalone, syncManifest } from './lib/install';
 import { getToken } from './lib/api';
 import { CelebrationOverlay } from './components/Celebration';
@@ -173,6 +176,9 @@ function Shell() {
         <Route path="/challenge" element={<NewChallenge />} />
         <Route path="/stats" element={<Stats />} />
         <Route path="/install" element={<Install />} />
+        <Route path="/levels" element={<Levels />} />
+        <Route path="/topics" element={<Topics />} />
+        <Route path="/capsule" element={<Capsule />} />
         <Route path="/j/:code" element={<Join />} />
         <Route path="*" element={<Home />} />
       </Routes>

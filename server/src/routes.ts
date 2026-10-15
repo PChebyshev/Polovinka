@@ -8,7 +8,10 @@ import { dateInTz, isValidTz } from './time.js';
 import { pickQuestion, ensureDaily } from './selection.js';
 import { counters, gesturePublic, pairPublic, partnerOf, roundPublic, userPublic } from './serialize.js';
 import { addClient, sendTo } from './sse.js';
-import { checkMilestones, unseenCelebrations } from './levels.js';
+import { checkMilestones, checkCapsules, badgesCount, levelFor, unseenCelebrations } from './levels.js';
+import { registerStage5Routes, capsuleState, repeatAvailable } from './routes5.js';
+import { streakFor } from './progress.js';
+import { LEVEL_HUG } from '../../shared/src/progress.js';
 import { registerStage2Routes, gestureTemplatesOf } from './routes2.js';
 import { registerStage3Routes, joinChallenge, challengeOfRound, notifyChallenge, myChallenges } from './routes3.js';
 import { registerStage4Routes } from './routes4.js';
@@ -60,17 +63,22 @@ function meResponse(user: UserRow): MeResponse {
   const pair = pairOf(user);
   const partner = partnerOf(user);
   const unseen = all<GestureRow>('SELECT * FROM gestures WHERE to_user_id = ? AND seen_at IS NULL ORDER BY created_at DESC LIMIT 10', user.id);
+  const c = counters(pair.id);
+  checkCapsules(pair.id);
   return {
     user: userPublic(user),
     pair: pairPublic(pair),
     partner: partner ? userPublic(partner) : null,
-    counters: counters(pair.id),
+    counters: c,
     inviteCode: pair.invite_code,
     unseenGestures: unseen.map(gesturePublic),
     celebrations: unseenCelebrations(pair.id, user.id),
     weekTheme: pair.week_theme,
     gestureTemplates: gestureTemplatesOf(pair.id),
     challenges: myChallenges(user),
+    streak: streakFor(pair),
+    badges: badgesCount(pair.id),
+    capsule: capsuleState(user, levelFor(c.discoveries).level),
   };
 }
 
@@ -143,6 +151,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   await registerStage2Routes(app, { meResponse });
   await registerStage3Routes(app, { meResponse, dataDir: opts.dataDir });
   await registerStage4Routes(app, { meResponse });
+  await registerStage5Routes(app);
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };
@@ -229,7 +238,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     const date = dateInTz(pair.tz);
     const daily = pair.is_guest ? null : ensureDaily(pair, date);
     if (!daily && !pair.is_guest) return reply.code(503).send({ error: 'no_questions_left' });
-    const bonus = all<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'bonus' ORDER BY created_at`, pair.id, date);
+    const bonus = all<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind IN ('bonus', 'repeat') ORDER BY created_at`, pair.id, date);
     const pending = all<RoundRow>(
       `SELECT r.* FROM rounds r
         WHERE r.pair_id = ? AND r.date < ? AND r.status = 'open' AND r.kind != 'challenge'
@@ -243,7 +252,8 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
       date,
       daily: daily ? roundPublic(daily, user, partner) : null,
       bonus: bonus.map((r) => roundPublic(r, user, partner)),
-      bonusLeft: Math.max(0, MAX_BONUS_PER_DAY - bonus.length),
+      bonusLeft: Math.max(0, MAX_BONUS_PER_DAY - bonus.filter((r) => r.kind === 'bonus').length),
+      repeatAvailable: !pair.is_guest && repeatAvailable(pair),
       pending: pending.map((r) => roundPublic(r, user, partner)),
     };
     return res;
@@ -311,7 +321,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     });
     logEvent('answer', { pairId: user.pair_id, userId: user.id, meta: { kind: round.kind } });
     const c = counters(user.pair_id);
-    const fresh_milestones = checkMilestones(user.pair_id, c.discoveries, c.daysTogether);
+    const fresh_milestones = checkMilestones(pairOf(user), c.discoveries);
     if (fresh_milestones.length) logEvent('milestone', { pairId: user.pair_id, meta: { keys: fresh_milestones } });
     if (revealed) {
       logEvent('reveal', { pairId: user.pair_id, meta: { kind: round.kind } });
@@ -404,6 +414,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     const body = (req.body ?? {}) as { type?: unknown; text?: unknown; clientId?: unknown };
     const type = body.type as GestureType;
     if (!(type in GESTURE_LABELS)) return reply.code(400).send({ error: 'type' });
+    if (type === 'hug' && levelFor(counters(user.pair_id).discoveries).level < LEVEL_HUG) return reply.code(403).send({ error: 'level' });
     const text = cleanText(body.text) ?? GESTURE_LABELS[type].replace('…', '');
     const clientId = typeof body.clientId === 'string' && body.clientId.length <= 64 ? body.clientId : null;
     if (clientId) {

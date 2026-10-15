@@ -7,7 +7,9 @@ import { requireUser } from './auth.js';
 import { pickQuestion } from './selection.js';
 import { gesturePublic, partnerOf, roundPublic } from './serialize.js';
 import { sendTo } from './sse.js';
-import { markCelebrationSeen } from './levels.js';
+import { markCelebrationSeen, levelFor } from './levels.js';
+import { scoreFor } from './score.js';
+import { isCategoryUnlocked } from '../../shared/src/progress.js';
 
 const TEXT_MAX = 200;
 
@@ -232,6 +234,7 @@ export async function registerStage2Routes(app: FastifyInstance, deps: Deps) {
     const body = (req.body ?? {}) as { theme?: unknown };
     const theme = body.theme === null || body.theme === '' ? null : typeof body.theme === 'string' && body.theme in CATEGORY_LABELS ? body.theme : undefined;
     if (theme === undefined) return reply.code(400).send({ error: 'theme' });
+    if (theme && !isCategoryUnlocked(theme, levelFor(scoreFor(user.pair_id).discoveries).level)) return reply.code(403).send({ error: 'level' });
     run('UPDATE pairs SET week_theme = ? WHERE id = ?', theme, user.pair_id);
     logEvent('theme_set', { pairId: user.pair_id, userId: user.id, meta: { theme } });
     sendTo(partnerOf(user)?.id, { type: 'pair_updated' });

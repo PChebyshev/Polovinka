@@ -73,7 +73,7 @@ export function QuestionCard({
   return (
     <Card className="rise">
       <div className="flex items-center justify-between">
-        <Label>{title ?? (round.kind === 'bonus' ? 'Бонусный вопрос' : 'Вопрос дня')}</Label>
+        <Label>{title ?? (round.kind === 'bonus' ? 'Бонусный вопрос' : round.kind === 'repeat' ? 'Повтор: вопрос из прошлого' : 'Вопрос дня')}</Label>
         <Label>{layerLabel}</Label>
       </div>
       <h2 className="mt-3 text-2xl font-semibold leading-tight">{q.text}</h2>

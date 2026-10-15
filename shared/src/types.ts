@@ -1,8 +1,8 @@
 export type Layer = 'light' | 'us' | 'deep';
 export type QuestionFormat = 'ab' | 'scale' | 'who' | 'from_partner';
 export type Choice = 'a' | 'b';
-export type GestureType = 'thanks' | 'thinking' | 'proud';
-export type RoundKind = 'daily' | 'bonus' | 'challenge';
+export type GestureType = 'thanks' | 'thinking' | 'proud' | 'hug';
+export type RoundKind = 'daily' | 'bonus' | 'challenge' | 'repeat';
 
 export interface Question {
   id: string;
@@ -35,6 +35,47 @@ export interface PairPublic {
   tz: string;
   createdAt: string;
   isGuest: boolean;
+}
+
+export type StreakDay = 'done' | 'grace' | 'missed' | 'today' | 'before';
+
+export interface Streak {
+  current: number;
+  best: number;
+  todayDone: boolean;
+  /** Последние 7 дней, от старого к сегодняшнему. */
+  week: Array<{ date: string; state: StreakDay }>;
+}
+
+export interface TopicProgress {
+  key: string;
+  label: string;
+  unlocked: boolean;
+  unlockLevel: number;
+  explored: number;
+  right: number;
+  total: number;
+  badgeExplored: boolean;
+  badgeKnow: boolean;
+  /** Вопросов темы, которые ещё не задавали паре. */
+  remaining: number;
+}
+
+export interface CapsuleLetterPublic {
+  userId: string;
+  text: string | null;
+  createdAt: string;
+}
+
+export interface CapsulePublic {
+  id: string;
+  prompt: string;
+  createdAt: string;
+  opensAt: string;
+  opened: boolean;
+  /** Кто уже написал (до открытия текста не видно). */
+  wroteIds: string[];
+  letters: CapsuleLetterPublic[];
 }
 
 export interface Counters {
@@ -103,6 +144,9 @@ export interface HistoryResponse {
 export const LEVELS = [0, 5, 10, 25, 50, 100, 200, 365];
 
 export const CATEGORY_LABELS: Record<string, string> = {
+  childhood: 'Детство',
+  future: 'Наше будущее',
+  again: 'Если бы встретились снова',
   food: 'Еда',
   rest: 'Отдых',
   home: 'Быт',
@@ -147,6 +191,8 @@ export interface RoundPublic {
     /** Имя автора своего вопроса, если это не я. */
     authorName: string | null;
   };
+  /** Для «Повтора»: как пара ответила на этот вопрос в прошлый раз. */
+  origin: { date: string; mine: AnswerPublic | null; partner: AnswerPublic | null } | null;
   /** Мой ответ, если есть. */
   mine: AnswerPublic | null;
   /** Ответил ли партнёр. */
@@ -176,6 +222,9 @@ export interface MeResponse {
   weekTheme: string | null;
   gestureTemplates: GestureTemplate[];
   challenges: MyChallenge[];
+  streak: Streak;
+  badges: number;
+  capsule: { active: CapsulePublic | null; unreadOpened: CapsulePublic | null; canCreate: boolean };
 }
 
 export interface TodayResponse {
@@ -184,6 +233,8 @@ export interface TodayResponse {
   daily: RoundPublic | null;
   bonus: RoundPublic[];
   bonusLeft: number;
+  /** Можно взять «Повтор» сегодня. */
+  repeatAvailable: boolean;
   /** Старые раунды, где партнёр ждёт мой ответ. */
   pending: RoundPublic[];
 }
@@ -205,12 +256,14 @@ export const GESTURE_LABELS: Record<GestureType, string> = {
   thanks: 'Спасибо за…',
   thinking: 'Думаю о тебе',
   proud: 'Горжусь тобой',
+  hug: 'Обнимаю',
 };
 
 export const GESTURE_CHIPS: Record<GestureType, string[]> = {
   thanks: ['…утренний кофе', '…что выслушал(а)', '…вчерашний вечер', '…что ты рядом', '…терпение', '…смех'],
   thinking: ['Скучаю', 'Хочу обнять', 'Жду вечера', 'Ты сейчас где-то там, а я тут улыбаюсь', 'Вспомнил(а) тебя — и стало теплее'],
   proud: ['Ты справляешься', 'Вижу, как ты стараешься', 'Ты сегодня молодец', 'Горжусь тем, какой(ая) ты', 'Ты сильнее, чем думаешь'],
+  hug: ['Крепко-крепко', 'Обниму вечером', 'Держу тебя', 'Всё будет хорошо', 'Иди сюда'],
 };
 
 // --- Этап 3 ---------------------------------------------------------------

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { all, one, run, type PairRow, type UserRow } from './db.js';
 import { ensureDaily } from './selection.js';
+import { streakFor } from './progress.js';
 import { dateInTz } from './time.js';
 import { isOnline } from './sse.js';
 import { nowIso } from './ids.js';
@@ -234,9 +235,11 @@ export async function tickSchedule() {
           tag: 'evening',
         });
       } else if (!mine && !isOnline(u.id)) {
+        const st = streakFor(pair);
+        const streakNote = st.current >= 2 ? ` Это будет ${st.current + 1}-й день подряд.` : '';
         await sendPush(u, 'evening', {
           title: 'Вопрос дня ещё ждёт',
-          body: partner ? `${partner.name} уже ответил(а). Ваш ответ — и будет раскрытие.` : 'Ответьте, когда будет минутка. Вопрос никуда не денется.',
+          body: (partner ? `${partner.name} уже ответил(а). Ваш ответ — и будет раскрытие.` : 'Ответьте, когда будет минутка. Вопрос никуда не денется.') + streakNote,
           url: '/',
           tag: 'evening',
         });

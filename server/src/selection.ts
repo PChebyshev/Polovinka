@@ -1,5 +1,8 @@
 import { all, one, run, type PairRow, type QuestionRow, type RoundRow } from './db.js';
 import { newId, nowIso } from './ids.js';
+import { levelFor } from './levels.js';
+import { scoreFor } from './score.js';
+import { PACK_LEVEL, EXPLORE_AT, isCategoryUnlocked } from '../../shared/src/progress.js';
 import { addDays, daysBetween, weekdayInTz } from './time.js';
 
 const RATIO: Record<string, number> = { light: 0.6, us: 0.25, deep: 0.15 };
@@ -92,10 +95,13 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
   const marksByCategory = new Map<string, number>();
   for (const m of marked) marksByCategory.set(m.category, (marksByCategory.get(m.category) ?? 0) + 1);
 
+  // Наборы вопросов открываются с уровнем пары.
+  const level = levelFor(scoreFor(opts.pairId).discoveries).level;
+
   const candidates = all<QuestionRow>(
     `SELECT * FROM questions WHERE is_active = 1 AND (pair_id IS NULL OR pair_id = ?)`,
     opts.pairId,
-  ).filter((q) => !used.has(q.id) && !exclude.has(q.id) && !markedIds.has(q.id) && allowFormats.includes(q.format) && (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY);
+  ).filter((q) => isCategoryUnlocked(q.category, level) && !used.has(q.id) && !exclude.has(q.id) && !markedIds.has(q.id) && allowFormats.includes(q.format) && (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY);
 
   if (candidates.length === 0) return undefined;
 
@@ -141,7 +147,9 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
     const missRate = s && s.revealed > 0 ? s.missed / (s.revealed * 2) : 0;
     const marks = marksByCategory.get(q.category) ?? 0;
     const theme = opts.theme && q.category === opts.theme ? 3 : 1;
-    return Math.max(0.1, (1 + missRate * 2 - marks * 0.5) * theme);
+    // Только что открытый набор показываем чаще, пока пара не раскроет в нём EXPLORE_AT вопросов.
+    const fresh = q.category in PACK_LEVEL && (s?.revealed ?? 0) < EXPLORE_AT ? 3 : 1;
+    return Math.max(0.1, (1 + missRate * 2 - marks * 0.5) * theme * fresh);
   };
   return weightedPick(pool, weightOf, rnd);
 }

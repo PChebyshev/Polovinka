@@ -12,6 +12,7 @@ import { InviteCard } from '../components/InviteCard';
 import { RevealFlow } from '../components/RevealFlow';
 import { GestureCard } from '../components/GestureToast';
 import { LevelBar } from '../components/LevelBar';
+import { StreakBar } from '../components/StreakBar';
 import { Link } from 'react-router-dom';
 
 export function Home() {
@@ -44,6 +45,16 @@ export function Home() {
       else if (!(e instanceof TypeError)) await refresh();
     } finally {
       setBusy(false);
+    }
+  };
+
+  const repeat = async () => {
+    setBonusBusy(true);
+    try {
+      const r = await api.repeat();
+      setToday((prev) => (prev ? { ...prev, bonus: [...prev.bonus.filter((x) => x.id !== r.id), r], repeatAvailable: false } : prev));
+    } finally {
+      setBonusBusy(false);
     }
   };
 
@@ -96,6 +107,7 @@ export function Home() {
           partnerName={partner.name}
           onUpdated={patchRound}
           onBonus={round.kind === 'daily' ? bonus : undefined}
+          onRepeat={round.kind === 'daily' && today?.repeatAvailable ? repeat : undefined}
           bonusLeft={today?.bonusLeft}
         />
       );
@@ -116,6 +128,7 @@ export function Home() {
           {c.guessesTotal > 0 ? `угадали друг друга ${c.guessesRight} из ${c.guessesTotal}` : 'угадывайте выбор друг друга'} · {nDiscoveries(c.discoveries)} · {nDays(c.daysTogether)} в игре
         </div>
       </header>
+      {partner && <StreakBar streak={me.streak} />}
       {partner && <LevelBar counters={c} />}
 
       {(offline || queuedNote) && <div className="mb-3 rounded-2xl bg-surface-2 px-4 py-2 text-center text-xs text-muted">Нет сети. Ответ сохранён на телефоне и отправится, когда она появится.</div>}
@@ -123,6 +136,22 @@ export function Home() {
       <div className="space-y-4">
         <InstallCard />
         {partner && <NotificationPrompt />}
+
+        {me.capsule.unreadOpened && (
+          <Link to="/capsule" className="block rounded-2xl border border-sand/50 bg-sand/10 px-4 py-3">
+            <div className="text-xs uppercase tracking-wider text-muted">Капсула времени открылась</div>
+            <div className="mt-1 text-sm">Письма, написанные месяц назад, можно прочитать →</div>
+          </Link>
+        )}
+        {me.capsule.active && !me.capsule.active.wroteIds.includes(me.user.id) && (
+          <Link to="/capsule" className="block rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
+            <div className="text-xs uppercase tracking-wider text-muted">Капсула времени</div>
+            <div className="mt-1 text-sm">
+              {me.capsule.active.wroteIds.length > 0 ? `${partner?.name ?? 'Половинка'} уже запечатал(а) письмо. Ваша очередь →` : 'Напишите письмо в капсулу →'}
+            </div>
+          </Link>
+        )}
+        {me.capsule.canCreate && !me.capsule.unreadOpened && <CapsuleInvite />}
 
         {me.unseenGestures.map((g) => (
           <GestureCard key={g.id} gesture={g} fromName={partner?.name ?? 'половинка'} onSeen={() => seenGesture(g.id)} />
@@ -183,5 +212,41 @@ export function Home() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Приглашение создать первую капсулу: показываем, пока не создали или не скрыли. */
+function CapsuleInvite() {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem('polovinka.capsuleInvite') === '1';
+    } catch {
+      return false;
+    }
+  });
+  if (hidden) return null;
+  return (
+    <Card tone="sage">
+      <Label>Открыто на уровне 3</Label>
+      <p className="mt-2 text-sm">Капсула времени: напишите друг другу письма, которые откроются через месяц.</p>
+      <div className="mt-3 flex gap-2">
+        <Link to="/capsule" className="flex-1 rounded-2xl bg-accent px-4 py-3 text-center font-semibold text-bg">
+          Написать
+        </Link>
+        <button
+          className="px-3 text-sm text-muted"
+          onClick={() => {
+            try {
+              localStorage.setItem('polovinka.capsuleInvite', '1');
+            } catch {
+              /* пусто */
+            }
+            setHidden(true);
+          }}
+        >
+          Потом
+        </button>
+      </div>
+    </Card>
   );
 }

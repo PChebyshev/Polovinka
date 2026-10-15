@@ -1,4 +1,5 @@
 import { enqueue } from './queue';
+import type { CapsulePublic, TopicProgress } from '@polovinka/shared';
 import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
@@ -133,6 +134,12 @@ export const api = {
   pushSubscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/api/push/subscribe', sub),
   pushUnsubscribe: (endpoint?: string) => request<{ ok: true }>('DELETE', '/api/push/subscribe', endpoint ? { endpoint } : {}),
   pushStatus: () => request<{ subscribed: boolean; endpoints: string[] }>('GET', '/api/push/status'),
+  topics: () => request<{ level: number; topics: TopicProgress[] }>('GET', '/api/topics'),
+  repeat: () => request<RoundPublic>('POST', '/api/rounds/repeat'),
+  capsules: () => request<{ prompts: string[]; capsules: CapsulePublic[]; level: number; days: number }>('GET', '/api/capsules'),
+  createCapsule: (prompt: string) => request<CapsulePublic>('POST', '/api/capsules', { prompt }),
+  writeCapsule: (id: string, text: string) => request<CapsulePublic>('POST', `/api/capsules/${id}/letter`, { text }),
+  readCapsule: (id: string) => request<{ ok: true }>('POST', `/api/capsules/${id}/read`, {}),
   createHandoff: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes/handoff'),
   createLoginCode: () => request<{ code: string; expiresAt: string }>('POST', '/api/login-codes'),
   redeemLoginCode: (code: string) => request<{ token: string; me: MeResponse }>('POST', '/api/login-codes/redeem', { code }),

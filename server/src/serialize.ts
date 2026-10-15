@@ -98,6 +98,15 @@ export function roundPublic(round: RoundRow, viewer: UserRow, partner: UserRow |
       isCustom: !!q.pair_id,
       authorName,
     },
+    origin: (() => {
+      if (!round.origin_round_id) return null;
+      const o = one<RoundRow>('SELECT * FROM rounds WHERE id = ?', round.origin_round_id);
+      if (!o) return null;
+      const oa = all<AnswerRow>('SELECT * FROM answers WHERE round_id = ?', o.id);
+      const om = oa.find((a) => a.user_id === viewer.id);
+      const ot = partner ? oa.find((a) => a.user_id === partner.id) : undefined;
+      return { date: o.date, mine: om ? answerPublic(om, q.format, viewer.id) : null, partner: ot ? answerPublic(ot, q.format, viewer.id) : null };
+    })(),
     mine: mine ? answerPublic(mine, q.format, viewer.id) : null,
     partnerAnswered: !!theirs,
     partner: round.status === 'revealed' && theirs ? answerPublic(theirs, q.format, viewer.id) : null,

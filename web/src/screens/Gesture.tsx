@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GestureType } from '@polovinka/shared';
-import { GESTURE_CHIPS, GESTURE_LABELS } from '@polovinka/shared';
+import { GESTURE_CHIPS, GESTURE_LABELS, LEVEL_HUG } from '@polovinka/shared';
 import { api, clientId, QueuedError } from '../lib/api';
 import { useStore } from '../lib/store';
 import { Button, Card, Chip, Label } from '../components/ui';
 import { InviteCard } from '../components/InviteCard';
 import { buzz } from '../lib/share';
 
-const TYPES: GestureType[] = ['thanks', 'thinking', 'proud'];
+const BASE_TYPES: GestureType[] = ['thanks', 'thinking', 'proud'];
 
 export function Gesture() {
   const { me, refresh } = useStore();
@@ -22,6 +22,7 @@ export function Gesture() {
   const [queued, setQueued] = useState(false);
 
   if (!me) return null;
+  const TYPES: GestureType[] = me.counters.level >= LEVEL_HUG ? [...BASE_TYPES, 'hug'] : BASE_TYPES;
   if (!me.partner) {
     return (
       <div className="mx-auto max-w-md px-4 pb-28 pt-4">
@@ -73,7 +74,7 @@ export function Gesture() {
       <h1 className="text-2xl font-bold">Тёплый жест</h1>
       <p className="mt-1 text-sm text-muted">{me.partner.name} получит карточку. Один тап, и дома теплее.</p>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className={`mt-4 grid gap-2 ${TYPES.length === 4 ? 'grid-cols-2' : 'grid-cols-3'}`}>
         {TYPES.map((t) => (
           <button
             key={t}

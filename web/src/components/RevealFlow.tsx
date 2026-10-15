@@ -34,6 +34,7 @@ export function RevealFlow({
   partnerName,
   onUpdated,
   onBonus,
+  onRepeat,
   bonusLeft,
 }: {
   round: RoundPublic;
@@ -41,6 +42,7 @@ export function RevealFlow({
   partnerName: string;
   onUpdated: (r: RoundPublic) => void;
   onBonus?: () => void;
+  onRepeat?: () => void;
   bonusLeft?: number;
 }) {
   const [stage, setStage] = useState<Stage>(() => loadStage(round.id));
@@ -121,7 +123,7 @@ export function RevealFlow({
 
       <Card className="rise">
         <div className="flex items-center justify-between">
-          <Label>{round.kind === 'bonus' ? 'Бонусный вопрос' : 'Вопрос дня'}</Label>
+          <Label>{(round.kind === 'bonus' ? 'Бонусный вопрос' : round.kind === 'repeat' ? 'Повтор: вопрос из прошлого' : 'Вопрос дня')}</Label>
           {q.isCustom && <Label>{q.authorName ? `Вопрос от: ${q.authorName}` : 'Ваш вопрос'}</Label>}
         </div>
         <h2 className="mt-2 text-xl font-semibold leading-tight">{q.text}</h2>
@@ -163,6 +165,22 @@ export function RevealFlow({
                 {theirs.guess && <span className="text-muted"> — {theyGuessed ? 'в точку' : 'мимо'}</span>}
               </div>
             </div>
+            {round.origin && (
+              <div className="mt-3 rounded-2xl border border-line px-4 py-3 text-sm">
+                <div className="text-xs text-muted">
+                  В прошлый раз, {new Date(`${round.origin.date}T12:00:00`).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+                </div>
+                <div className="mt-1">
+                  {myName}: {round.origin.mine ? label(round.origin.mine.choice) : '—'}
+                  {round.origin.mine && (round.origin.mine.choice === mine.choice ? <span className="text-muted"> · не изменилось</span> : <span className="text-sand"> · теперь иначе</span>)}
+                </div>
+                <div>
+                  {partnerName}: {round.origin.partner ? label(round.origin.partner.choice) : '—'}
+                  {round.origin.partner &&
+                    (round.origin.partner.choice === theirs.choice ? <span className="text-muted"> · не изменилось</span> : <span className="text-sand"> · теперь иначе</span>)}
+                </div>
+              </div>
+            )}
             {(whyOf(mine) || whyOf(theirs)) && (
               <div className="mt-3 space-y-1 rounded-2xl bg-surface-2 px-4 py-3 text-sm">
                 {whyOf(mine) && (
@@ -245,6 +263,11 @@ export function RevealFlow({
           {onBonus && (bonusLeft ?? 0) > 0 && (
             <Button variant="secondary" className="w-full" onClick={onBonus}>
               Ещё один вопрос? Осталось {bonusLeft}
+            </Button>
+          )}
+          {onRepeat && (
+            <Button variant="secondary" className="w-full" onClick={onRepeat}>
+              Повтор: изменились ли ваши ответы?
             </Button>
           )}
         </div>

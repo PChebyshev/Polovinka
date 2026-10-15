@@ -200,3 +200,23 @@ CREATE TABLE IF NOT EXISTS push_log (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS push_log_time ON push_log(created_at);
+
+-- Капсула времени: письма друг другу, которые откроются позже.
+CREATE TABLE IF NOT EXISTS capsules (
+  id TEXT PRIMARY KEY,
+  pair_id TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  opens_at TEXT NOT NULL,
+  read_by TEXT NOT NULL DEFAULT '[]'
+);
+CREATE INDEX IF NOT EXISTS capsules_pair ON capsules(pair_id, opens_at);
+
+CREATE TABLE IF NOT EXISTS capsule_letters (
+  capsule_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (capsule_id, user_id)
+);
