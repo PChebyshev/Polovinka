@@ -27,7 +27,7 @@ export function WaitingCard({ round, partnerName }: { round: RoundPublic; partne
 
   return (
     <Card className="rise">
-      <Label>{(round.kind === 'bonus' ? 'Бонусный вопрос' : round.kind === 'repeat' ? 'Повтор: вопрос из прошлого' : 'Вопрос дня')}</Label>
+      <Label>{round.kind === 'bonus' ? 'Бонусный вопрос' : round.kind === 'repeat' ? 'Повтор: вопрос из прошлого' : 'Вопрос дня'}</Label>
       <h2 className="mt-2 text-xl font-semibold leading-tight">{q.text}</h2>
       <div className="mt-4 rounded-2xl bg-surface-2 px-4 py-3 text-sm">
         <div>
@@ -45,7 +45,9 @@ export function WaitingCard({ round, partnerName }: { round: RoundPublic; partne
           <Heart className="h-10 w-10" />
         </div>
         <p className="mt-3 text-muted">
-          {partnerName ? `${partnerName} ещё не ответил(а). Раскроем, как только ответите оба.` : 'Ответ ждёт половинку. Как только она ответит, раскроем обоим.'}
+          {partnerName
+            ? `${partnerName} ещё не ответил(а). Раскроем, как только ответите оба.`
+            : 'Ответ ждёт половинку. Как только она ответит, раскроем обоим.'}
         </p>
       </div>
 

@@ -1,5 +1,5 @@
 import { enqueue } from './queue';
-import type { BookResponse, CapsulePublic, MemoryCard, TopicProgress } from '@polovinka/shared';
+import type { BookResponse, CapsulePublic, CareHint, Idea, MemoryCard, PairStage, RoundIdea, TopicProgress } from '@polovinka/shared';
 import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
@@ -151,6 +151,17 @@ export const api = {
   capsules: () => request<{ prompts: string[]; capsules: CapsulePublic[]; level: number; terms: number[]; canCreate: boolean }>('GET', '/api/capsules'),
   createCapsule: (prompt: string, days: number) => request<CapsulePublic>('POST', '/api/capsules', { prompt, days }),
   memory: () => request<{ memory: MemoryCard | null }>('GET', '/api/memory'),
+  setProfile: (patch: { stage?: PairStage | null; hasKids?: boolean | null }) => request<MeResponse>('PUT', '/api/pair/profile', patch),
+  setPrefs: (patch: { intimacy?: boolean; careHints?: boolean }) => request<MeResponse>('PUT', '/api/me/prefs', patch),
+  roundIdeas: (roundId: string) => request<{ ideas: RoundIdea[]; source: string; saved: boolean[] }>('GET', `/api/rounds/${roundId}/ideas`),
+  ideas: () => request<{ ideas: Idea[] }>('GET', '/api/ideas'),
+  addIdea: (text: string, kind: 'do' | 'talk' = 'do', roundId?: string) => request<Idea>('POST', '/api/ideas', { text, kind, roundId }),
+  doneIdea: (id: string, done = true) => request<Idea>('POST', `/api/ideas/${id}/done`, { done }),
+  removeIdea: (id: string) => request<{ ok: true }>('DELETE', `/api/ideas/${id}`),
+  careHint: () => request<{ hint: CareHint | null }>('GET', '/api/care-hint'),
+  careSeen: (id: string) => request<{ ok: true }>('POST', `/api/care-hint/${id}/seen`, {}),
+  personalStatus: () => request<{ available: boolean; minLevel: number }>('GET', '/api/rounds/personal'),
+  personal: () => request<RoundPublic>('POST', '/api/rounds/personal', {}),
   book: () => request<BookResponse>('GET', '/api/book'),
   writeCapsule: (id: string, text: string) => request<CapsulePublic>('POST', `/api/capsules/${id}/letter`, { text }),
   readCapsule: (id: string) => request<{ ok: true }>('POST', `/api/capsules/${id}/read`, {}),
@@ -175,6 +186,7 @@ export interface AppConfig {
   dataLocation: string | null;
   contact: string | null;
   operator: string | null;
+  ai: string | null;
 }
 
 /** Скачать всю историю пары файлом JSON. */

@@ -6,6 +6,9 @@ import { NotificationPrompt } from '../components/NotificationPrompt';
 import { AccessNudge } from '../components/AccessNudge';
 import { RecommendNudge } from '../components/RecommendNudge';
 import { MemoryCardBox } from '../components/MemoryCard';
+import { StageCard } from '../components/StageCard';
+import { CareHintCard } from '../components/CareHintCard';
+import { PersonalQuestion } from '../components/PersonalQuestion';
 import { useStore } from '../lib/store';
 import { formatDate, matchPercent, nDays, nDiscoveries } from '../lib/format';
 import { Button, Card, Label, Spinner } from '../components/ui';
@@ -128,19 +131,26 @@ export function Home() {
         <div className="text-sm text-muted">{partner ? `${myName} и ${partner.name}` : myName}</div>
         <h1 className="text-2xl font-bold">{pct === null ? 'Половинка' : `Знаем друг друга на ${pct}%`}</h1>
         <div className="mt-1 text-xs text-muted">
-          {c.guessesTotal > 0 ? `угадали друг друга ${c.guessesRight} из ${c.guessesTotal}` : 'угадывайте выбор друг друга'} · {nDiscoveries(c.discoveries)} · {nDays(c.daysTogether)} в игре
+          {c.guessesTotal > 0 ? `угадали друг друга ${c.guessesRight} из ${c.guessesTotal}` : 'угадывайте выбор друг друга'} · {nDiscoveries(c.discoveries)} ·{' '}
+          {nDays(c.daysTogether)} в игре
         </div>
       </header>
       {partner && <StreakBar streak={me.streak} />}
       {partner && <LevelBar counters={c} />}
 
-      {(offline || queuedNote) && <div className="mb-3 rounded-2xl bg-surface-2 px-4 py-2 text-center text-xs text-muted">Нет сети. Ответ сохранён на телефоне и отправится, когда она появится.</div>}
+      {(offline || queuedNote) && (
+        <div className="mb-3 rounded-2xl bg-surface-2 px-4 py-2 text-center text-xs text-muted">
+          Нет сети. Ответ сохранён на телефоне и отправится, когда она появится.
+        </div>
+      )}
 
       <div className="space-y-4">
+        {partner && <StageCard />}
         <InstallCard />
         {partner && <NotificationPrompt />}
         {partner && <AccessNudge />}
         {partner && <RecommendNudge />}
+        {partner && <CareHintCard />}
         {partner && <MemoryCardBox myName={myName} partnerName={partner.name} />}
 
         {me.capsule.unreadOpened && (
@@ -153,7 +163,9 @@ export function Home() {
           <Link to="/capsule" className="block rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
             <div className="text-xs uppercase tracking-wider text-muted">Капсула времени</div>
             <div className="mt-1 text-sm">
-              {me.capsule.active.wroteIds.length > 0 ? `${partner?.name ?? 'Половинка'} уже запечатал(а) письмо. Ваша очередь →` : 'Напишите письмо в капсулу →'}
+              {me.capsule.active.wroteIds.length > 0
+                ? `${partner?.name ?? 'Половинка'} уже запечатал(а) письмо. Ваша очередь →`
+                : 'Напишите письмо в капсулу →'}
             </div>
           </Link>
         )}
@@ -165,7 +177,9 @@ export function Home() {
 
         {me.challenges.map((ch) => (
           <Link key={ch.code} to={`/c/${ch.code}`} className="block rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
-            <div className="text-xs uppercase tracking-wider text-muted">{ch.isSender ? 'Ваш вызов' : `Вызов от ${ch.fromNames[1] ? `${ch.fromNames[0]} и ${ch.fromNames[1]}` : ch.fromNames[0]}`}</div>
+            <div className="text-xs uppercase tracking-wider text-muted">
+              {ch.isSender ? 'Ваш вызов' : `Вызов от ${ch.fromNames[1] ? `${ch.fromNames[0]} и ${ch.fromNames[1]}` : ch.fromNames[0]}`}
+            </div>
             <div className="mt-1 text-sm">
               {ch.answered < ch.total ? `Пройдено ${ch.answered} из ${ch.total}` : ch.otherJoined ? 'Сравнение готово' : 'Ждём вторую пару'} →
             </div>
@@ -210,6 +224,17 @@ export function Home() {
         {today?.daily && renderRound(today.daily)}
 
         {today?.bonus.map((r) => renderRound(r))}
+
+        {today?.daily?.status === 'revealed' && partner && <PersonalQuestion />}
+
+        {partner && me.ideasOpen > 0 && (
+          <Link to="/ideas" className="block rounded-2xl border border-line bg-surface px-4 py-3">
+            <div className="text-xs uppercase tracking-wider text-muted">Хотим вместе</div>
+            <div className="mt-1 text-sm">
+              {me.ideasOpen} {me.ideasOpen % 10 === 1 && me.ideasOpen % 100 !== 11 ? 'идея ждёт' : 'идеи ждут'} вас →
+            </div>
+          </Link>
+        )}
 
         {today?.daily && today.daily.mine && today.daily.status !== 'revealed' && today.bonusLeft > 0 && partner && (
           <Button variant="ghost" className="w-full" onClick={bonus} disabled={bonusBusy}>

@@ -34,7 +34,14 @@ export function userPublic(u: UserRow): UserPublic {
 }
 
 export function pairPublic(p: PairRow): PairPublic {
-  return { id: p.id, tz: p.tz, createdAt: p.created_at, isGuest: !!p.is_guest };
+  return {
+    id: p.id,
+    tz: p.tz,
+    createdAt: p.created_at,
+    isGuest: !!p.is_guest,
+    stage: (p.stage as PairPublic['stage']) ?? null,
+    hasKids: p.has_kids === null || p.has_kids === undefined ? null : !!p.has_kids,
+  };
 }
 
 /** Для формата «кто из нас» в базе лежит id человека; наружу отдаём букву относительно зрителя. */
@@ -126,6 +133,7 @@ export function roundPublic(round: RoundRow, viewer: UserRow, partner: UserRow |
       topic: q.topic ? renderText(q.topic, me, them) : null,
       isCustom: !!q.pair_id,
       authorName,
+      source: q.source === 'ai' ? 'ai' : null,
     },
     origin: (() => {
       if (!round.origin_round_id) return null;

@@ -8,6 +8,7 @@ import { Friend } from './screens/Friend';
 import { Recommend } from './screens/Recommend';
 import { Book } from './screens/Book';
 import { Privacy } from './screens/Privacy';
+import { Ideas } from './screens/Ideas';
 import { Gesture } from './screens/Gesture';
 import { Settings } from './screens/Settings';
 import { History } from './screens/History';
@@ -187,6 +188,7 @@ function Shell() {
         <Route path="/f/:code" element={<Friend />} />
         <Route path="/recommend" element={<Recommend />} />
         <Route path="/book" element={<Book />} />
+        <Route path="/ideas" element={<Ideas />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="*" element={<Home />} />
       </Routes>

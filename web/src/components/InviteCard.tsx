@@ -24,9 +24,7 @@ export function InviteCard({ compact = false }: { compact?: boolean }) {
     <Card tone="accent" className="rise">
       <Label>Пара</Label>
       {!compact && <h2 className="mt-2 text-xl font-semibold">Позови половинку</h2>}
-      <p className="mt-2 text-sm text-muted">
-        Отправь ссылку в любом мессенджере. Половинка откроет её, введёт имя, и вы вместе.
-      </p>
+      <p className="mt-2 text-sm text-muted">Отправь ссылку в любом мессенджере. Половинка откроет её, введёт имя, и вы вместе.</p>
       <Button className="mt-4 w-full" big onClick={invite} disabled={state === 'busy'}>
         Позвать половинку
       </Button>

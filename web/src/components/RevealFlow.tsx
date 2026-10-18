@@ -4,6 +4,7 @@ import { Button, Card, Chip, Confetti, Label } from './ui';
 import { api } from '../lib/api';
 import { buzz } from '../lib/share';
 import { guessHit } from '../lib/format';
+import { RoundIdeas } from './RoundIdeas';
 
 type Stage = 'flip' | 'result' | 'why' | 'topic' | 'done';
 
@@ -242,6 +243,9 @@ export function RevealFlow({
           </div>
         )}
       </Card>
+
+      {/* Идеи — у вопроса дня, «Повтора» и вопроса по ответам; у обычных бонусных не загромождаем главную */}
+      {stage !== 'flip' && (round.kind !== 'bonus' || q.source === 'ai') && <RoundIdeas roundId={round.id} />}
 
       {stage === 'result' && (
         <div className="flex gap-3 rise-2">

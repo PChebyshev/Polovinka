@@ -100,6 +100,11 @@ function Action({ to, icon, title, hint }: { to: string; icon: ReactNode; title:
 }
 
 const Icon = {
+  ideas: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z" />
+    </svg>
+  ),
   week: (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <rect x="3" y="4" width="18" height="17" rx="3" />
@@ -320,6 +325,7 @@ function Overview() {
         <div className="grid grid-cols-2 gap-2">
           <Action to="/week" icon={Icon.week} title="Итог недели" hint="Карточка для сторис" />
           <Action to="/capsule" icon={Icon.capsule} title="Капсула времени" hint="Письма в будущее" />
+          <Action to="/ideas" icon={Icon.ideas} title="Хотим вместе" hint={me.ideasOpen ? `Идей в списке: ${me.ideasOpen}` : 'Идеи на выходные'} />
           <Action to="/challenge" icon={Icon.duel} title="Вызвать пару" hint="5 вопросов друзьям" />
           {c.level >= LEVEL_BOOK ? (
             <Action to="/book" icon={Icon.levels} title="Книга пары" hint="Вся история одной книгой" />

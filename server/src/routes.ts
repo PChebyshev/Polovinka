@@ -18,6 +18,8 @@ import { registerStage4Routes } from './routes4.js';
 import { registerAccessRoutes, accessState } from './access.js';
 import { registerRecommendRoutes, refPair } from './recommend.js';
 import { registerMemoryRoutes } from './memories.js';
+import { registerIdeaRoutes, ideasOpen, prefsFor } from './ideas.js';
+import { aiEnabled } from './ai.js';
 import { pushReveal, pushPartnerAnswered } from './push.js';
 import { guessHit } from './score.js';
 
@@ -83,6 +85,9 @@ function meResponse(user: UserRow): MeResponse {
     badges: badgesCount(pair.id),
     capsule: capsuleState(user, levelFor(c.discoveries).level),
     access: accessState(user),
+    prefs: prefsFor(user),
+    ai: aiEnabled(),
+    ideasOpen: ideasOpen(pair.id),
   };
 }
 
@@ -163,6 +168,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   await registerAccessRoutes(app, { meResponse });
   await registerRecommendRoutes(app);
   await registerMemoryRoutes(app);
+  await registerIdeaRoutes(app, { meResponse });
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };

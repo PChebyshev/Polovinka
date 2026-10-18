@@ -1,5 +1,6 @@
 import type { Streak, StreakDay, TopicProgress } from '../../shared/src/types.js';
-import { EXPLORE_AT, KNOW_MIN_GUESSES, KNOW_RATIO, PACK_LEVEL, STREAK_GRACE_EVERY_DAYS, TOPICS, isCategoryUnlocked } from '../../shared/src/progress.js';
+import { EXPLORE_AT, KNOW_MIN_GUESSES, KNOW_RATIO, PACK_LEVEL, STREAK_GRACE_EVERY_DAYS, TOPICS, isCategoryUnlocked, isCategoryVisible } from '../../shared/src/progress.js';
+import { pairFlags } from './selection.js';
 import { all, type PairRow } from './db.js';
 import { addDays, dateInTz, daysBetween } from './time.js';
 import { guessHit } from './score.js';
@@ -84,7 +85,8 @@ export function topicsFor(pairId: string, level: number): TopicProgress[] {
       pairId,
     ).map((r) => [r.category, Number(r.n)]),
   );
-  return TOPICS.map((t) => {
+  const flags = pairFlags(pairId);
+  return TOPICS.filter((t) => isCategoryVisible(t.key, flags)).map((t) => {
     const s = stat.get(t.key) ?? { explored: 0, right: 0, total: 0 };
     return {
       key: t.key,

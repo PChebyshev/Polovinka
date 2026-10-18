@@ -4,6 +4,7 @@ import { all, one, run, logEvent, type UserRow } from './db.js';
 import { hashToken, newId, newToken, nowIso } from './ids.js';
 import { requireUser } from './auth.js';
 import { mailEnabled, sendMail } from './mail.js';
+import { aiProviderName } from './ai.js';
 import type { AccessState } from '../../shared/src/types.js';
 
 /**
@@ -172,6 +173,7 @@ export async function registerAccessRoutes(app: FastifyInstance, deps: { meRespo
     dataLocation: process.env.DATA_LOCATION?.trim() || null,
     contact: process.env.PRIVACY_CONTACT?.trim() || null,
     operator: process.env.OPERATOR_NAME?.trim() || null,
+    ai: aiProviderName(),
   }));
 
   // --- Код восстановления -------------------------------------------------------

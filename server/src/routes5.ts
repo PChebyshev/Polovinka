@@ -76,7 +76,7 @@ function repeatCandidate(pairId: string, today: string): RoundRow | undefined {
       WHERE r.pair_id = ? AND r.status = 'revealed' AND r.kind IN ('daily', 'bonus') AND r.date <= ?
         AND q.format IN ('ab', 'scale', 'who')
         AND NOT EXISTS (SELECT 1 FROM rounds x WHERE x.origin_round_id = r.id)
-      ORDER BY r.date ASC LIMIT 1`,
+      ORDER BY q.changeable DESC, r.date ASC LIMIT 1`,
     pairId,
     addDays(today, -30),
   );

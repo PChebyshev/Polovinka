@@ -9,7 +9,8 @@ import { NotificationSettings } from '../components/NotificationSettings';
 import { InstallCard } from '../components/InstallCard';
 import { LoginCodeBox } from '../components/LoginCode';
 import { EmailBox, RecoveryBox, RevokeBox } from '../components/Access';
-import { CATEGORY_LABELS, GESTURE_LABELS, LEVEL_HUG, isCategoryUnlocked } from '@polovinka/shared';
+import { CATEGORY_LABELS, GESTURE_LABELS, LEVEL_HUG, isCategoryUnlocked, isCategoryVisible } from '@polovinka/shared';
+import { AboutUs } from '../components/AboutUs';
 import { Chip } from '../components/ui';
 
 export function Settings() {
@@ -103,6 +104,8 @@ export function Settings() {
         </div>
       )}
 
+      {me.partner && <AboutUs />}
+
       <div className="mt-4">
         <CustomQuestions myId={me.user.id} partnerName={me.partner?.name ?? null} />
       </div>
@@ -115,7 +118,11 @@ export function Settings() {
             Без темы
           </Chip>
           {Object.entries(CATEGORY_LABELS)
-            .filter(([k]) => isCategoryUnlocked(k, me.counters.level))
+            .filter(
+              ([k]) =>
+                isCategoryUnlocked(k, me.counters.level) &&
+                isCategoryVisible(k, { hasKids: me.pair.hasKids, intimacy: me.prefs.intimacy && me.prefs.partnerIntimacy }),
+            )
             .map(([k, label]) => (
               <Chip key={k} active={me.weekTheme === k} onClick={() => setTheme(k)}>
                 {label}

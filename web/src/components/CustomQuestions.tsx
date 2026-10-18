@@ -17,7 +17,10 @@ export function CustomQuestions({ myId, partnerName }: { myId: string; partnerNa
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.customQuestions().then((r) => setList(r.questions)).catch(() => setList([]));
+    api
+      .customQuestions()
+      .then((r) => setList(r.questions))
+      .catch(() => setList([]));
   }, []);
 
   const add = async () => {
@@ -47,11 +50,19 @@ export function CustomQuestions({ myId, partnerName }: { myId: string; partnerNa
         <Label>Свои вопросы</Label>
         <span className="text-xs text-muted">{list?.length ?? 0}</span>
       </div>
-      <p className="mt-2 text-sm text-muted">Ваш вопрос выйдет ближайшим вопросом дня. {partnerName ? `${partnerName} увидит подпись «Вопрос от: ${'вас'}».` : ''}</p>
+      <p className="mt-2 text-sm text-muted">
+        Ваш вопрос выйдет ближайшим вопросом дня. {partnerName ? `${partnerName} увидит подпись «Вопрос от: ${'вас'}».` : ''}
+      </p>
 
       {open ? (
         <div className="mt-3 space-y-2">
-          <input className={input} placeholder="Вопрос, например: Куда поедем в отпуск?" maxLength={160} value={text} onChange={(e) => setText(e.target.value)} />
+          <input
+            className={input}
+            placeholder="Вопрос, например: Куда поедем в отпуск?"
+            maxLength={160}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
           <div className="grid grid-cols-2 gap-2">
             <input className={input} placeholder="Вариант A" maxLength={60} value={a} onChange={(e) => setA(e.target.value)} />
             <input className={input} placeholder="Вариант B" maxLength={60} value={b} onChange={(e) => setB(e.target.value)} />
@@ -86,7 +97,7 @@ export function CustomQuestions({ myId, partnerName }: { myId: string; partnerNa
               <div>
                 <div>{q.text}</div>
                 <div className="text-xs text-muted">
-                  {q.a} / {q.b} · {q.authorId === myId ? 'мой' : partnerName ?? 'половинка'}
+                  {q.a} / {q.b} · {q.authorId === myId ? 'мой' : (partnerName ?? 'половинка')}
                   {q.used ? ' · уже был' : ' · в очереди'}
                 </div>
               </div>

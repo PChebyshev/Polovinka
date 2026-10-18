@@ -17,7 +17,10 @@ export function NotificationSettings() {
       const r = await api.pushTest();
       if (r.tooSoon) setTestNote('Подождите полминуты перед следующей проверкой.');
       else if (r.disabled) setTestNote('Push выключен на сервере.');
-      else if (r.sent > 0) setTestNote('Отправлено. Уведомление должно прийти в течение минуты. Если нет — проверьте, что уведомления для «Половинка» разрешены в настройках телефона.');
+      else if (r.sent > 0)
+        setTestNote(
+          'Отправлено. Уведомление должно прийти в течение минуты. Если нет — проверьте, что уведомления для «Половинка» разрешены в настройках телефона.',
+        );
       else if (r.failed > 0)
         setTestNote(
           `Сервис уведомлений отказал: ${r.statuses.join(', ')} ${(r.reasons ?? []).join('; ')}. Выключите и снова включите уведомления на этом телефоне. Если ошибка повторится, пришлите этот текст.`,
@@ -70,7 +73,9 @@ export function NotificationSettings() {
 
       {support === 'insecure' && <p className="mt-3 text-sm text-sand">Уведомления работают только по HTTPS.</p>}
       {support === 'unsupported' && <p className="mt-3 text-sm text-sand">Этот браузер не поддерживает push.</p>}
-      {support === 'needs_install' && <p className="mt-3 text-sm text-sand">На iPhone уведомления приходят только после «Добавить на экран „Домой“» в Safari.</p>}
+      {support === 'needs_install' && (
+        <p className="mt-3 text-sm text-sand">На iPhone уведомления приходят только после «Добавить на экран „Домой“» в Safari.</p>
+      )}
       {support === 'denied' && <p className="mt-3 text-sm text-sand">Уведомления запрещены в настройках браузера для этого сайта.</p>}
 
       {support === 'ok' && (
@@ -89,11 +94,23 @@ export function NotificationSettings() {
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <label>
           <div className="mb-1 text-xs text-muted">Утренний вопрос</div>
-          <input type="time" className={`${input} w-full`} defaultValue={me.user.notifMorning} onBlur={(e) => setTime('notifMorning', e.target.value)} onChange={(e) => e.target.value.length === 5 && setTime('notifMorning', e.target.value)} />
+          <input
+            type="time"
+            className={`${input} w-full`}
+            defaultValue={me.user.notifMorning}
+            onBlur={(e) => setTime('notifMorning', e.target.value)}
+            onChange={(e) => e.target.value.length === 5 && setTime('notifMorning', e.target.value)}
+          />
         </label>
         <label>
           <div className="mb-1 text-xs text-muted">Вечернее раскрытие</div>
-          <input type="time" className={`${input} w-full`} defaultValue={me.user.notifEvening} onBlur={(e) => setTime('notifEvening', e.target.value)} onChange={(e) => e.target.value.length === 5 && setTime('notifEvening', e.target.value)} />
+          <input
+            type="time"
+            className={`${input} w-full`}
+            defaultValue={me.user.notifEvening}
+            onBlur={(e) => setTime('notifEvening', e.target.value)}
+            onChange={(e) => e.target.value.length === 5 && setTime('notifEvening', e.target.value)}
+          />
         </label>
       </div>
       <p className="mt-2 text-xs text-muted">Если раскрытие случилось раньше, вечернее уведомление придёт сразу, а не по расписанию.</p>

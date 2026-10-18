@@ -6,7 +6,16 @@ import { Button } from './ui';
 
 function ShareIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="inline h-5 w-5 -translate-y-0.5 text-[#4ea1ff]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="значок «Поделиться»">
+    <svg
+      viewBox="0 0 24 24"
+      className="inline h-5 w-5 -translate-y-0.5 text-[#4ea1ff]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-label="значок «Поделиться»"
+    >
       <path d="M12 3v12" />
       <path d="M8 7l4-4 4 4" />
       <path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" />
@@ -16,7 +25,15 @@ function ShareIcon() {
 
 function AddIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="inline h-5 w-5 -translate-y-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-label="значок «На экран Домой»">
+    <svg
+      viewBox="0 0 24 24"
+      className="inline h-5 w-5 -translate-y-0.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-label="значок «На экран Домой»"
+    >
       <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
       <path d="M12 8v8M8 12h8" />
     </svg>

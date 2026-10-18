@@ -75,6 +75,13 @@ function Entry({ e, myId, myName, partnerName }: { e: BookEntry; myId: string; m
       </div>
     );
   }
+  if (e.type === 'idea') {
+    return (
+      <div className="book-entry py-2 text-sm">
+        <span className="text-sage">✓ Сделали вместе · {dayOf(e.at)}:</span> {e.idea.text}
+      </div>
+    );
+  }
   return (
     <div className="book-entry py-2 text-center text-xs text-accent">
       ✦ {e.title} · {dayOf(e.at)} ✦

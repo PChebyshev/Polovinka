@@ -158,7 +158,19 @@ export function TopicMedal({ topic, tier, size = 56, className = '' }: { topic: 
       </defs>
 
       {/* бусинный ободок у золотой медали */}
-      {gold && <circle cx="32" cy="32" r="27.5" fill="none" stroke="var(--color-sand)" strokeWidth={3} strokeDasharray="1.2 3.1" strokeLinecap="round" opacity={0.95} />}
+      {gold && (
+        <circle
+          cx="32"
+          cy="32"
+          r="27.5"
+          fill="none"
+          stroke="var(--color-sand)"
+          strokeWidth={3}
+          strokeDasharray="1.2 3.1"
+          strokeLinecap="round"
+          opacity={0.95}
+        />
+      )}
       {/* кольцо */}
       <circle
         cx="32"

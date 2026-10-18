@@ -2,15 +2,26 @@ import { all, one, run, type PairRow, type QuestionRow, type RoundRow } from './
 import { newId, nowIso } from './ids.js';
 import { levelFor } from './levels.js';
 import { scoreFor } from './score.js';
-import { PACK_LEVEL, EXPLORE_AT, isCategoryUnlocked } from '../../shared/src/progress.js';
+import { PACK_LEVEL, EXPLORE_AT, isCategoryUnlocked, isCategoryVisible, stageLayerRatio, stageWeight } from '../../shared/src/progress.js';
 import { addDays, daysBetween, weekdayInTz } from './time.js';
 
-const RATIO: Record<string, number> = { light: 0.6, us: 0.25, deep: 0.15 };
 const DEEP_PER_WEEK = 2;
 const FIRST_DAYS_WITHOUT_DEEP = 3;
 const SURPRISE_FROM_DAY = 5;
 const SURPRISE_EVERY_DAYS = 10;
 const MARKS_TO_DISABLE_CATEGORY = 3;
+const INTIMACY_PER_WEEK = 1;
+
+/** Флаги пары, от которых зависят наборы: стадия, дети, согласие обоих на «Близость». */
+export function pairFlags(pairId: string): { stage: string | null; hasKids: boolean | null; intimacy: boolean } {
+  const p = one<{ stage: string | null; has_kids: number | null }>('SELECT stage, has_kids FROM pairs WHERE id = ?', pairId);
+  const members = all<{ intimacy_ok: number }>('SELECT intimacy_ok FROM users WHERE pair_id = ?', pairId);
+  return {
+    stage: p?.stage ?? null,
+    hasKids: p?.has_kids === null || p?.has_kids === undefined ? null : !!p.has_kids,
+    intimacy: members.length === 2 && members.every((m) => m.intimacy_ok === 1),
+  };
+}
 
 function hashSeed(s: string): number {
   let h = 2166136261;
@@ -98,10 +109,20 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
   // Наборы вопросов открываются с уровнем пары.
   const level = levelFor(scoreFor(opts.pairId).discoveries).level;
 
+  const flags = pairFlags(opts.pairId);
+  const intimacyThisWeek = Number(
+    one<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM rounds r JOIN questions q ON q.id = r.question_id WHERE r.pair_id = ? AND r.date >= ? AND q.category = 'intimacy'`,
+      opts.pairId,
+      addDays(opts.date, -6),
+    )?.n ?? 0,
+  );
   const candidates = all<QuestionRow>(
-    `SELECT * FROM questions WHERE is_active = 1 AND (pair_id IS NULL OR pair_id = ?)`,
+    `SELECT * FROM questions WHERE is_active = 1 AND (pair_id IS NULL OR pair_id = ?) AND (source IS NULL OR source <> 'ai')`,
     opts.pairId,
-  ).filter((q) => isCategoryUnlocked(q.category, level) && !used.has(q.id) && !exclude.has(q.id) && !markedIds.has(q.id) && allowFormats.includes(q.format) && (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY);
+  ).filter((q) => isCategoryUnlocked(q.category, level) &&
+    isCategoryVisible(q.category, flags) &&
+    (q.category !== 'intimacy' || intimacyThisWeek < INTIMACY_PER_WEEK) && !used.has(q.id) && !exclude.has(q.id) && !markedIds.has(q.id) && allowFormats.includes(q.format) && (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY);
 
   if (candidates.length === 0) return undefined;
 
@@ -131,7 +152,8 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
     Number(recentDeep?.n ?? 0) < DEEP_PER_WEEK;
 
   const layers = (opts.solo ? ['light'] : ['light', 'us', 'deep']).filter((l) => (l !== 'deep' || deepAllowed) && candidates.some((q) => q.layer === l));
-  const layer = weightedPick(layers, (l) => RATIO[l], rnd) ?? 'light';
+  const ratio = stageLayerRatio(flags.stage);
+  const layer = weightedPick(layers, (l) => ratio[l], rnd) ?? 'light';
 
   // Форматы-сюрпризы: не раньше 5-го дня, примерно раз в 10 дней.
   let pool = candidates.filter((q) => q.layer === layer);
@@ -149,7 +171,9 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
     const theme = opts.theme && q.category === opts.theme ? 3 : 1;
     // Только что открытый набор показываем чаще, пока пара не раскроет в нём EXPLORE_AT вопросов.
     const fresh = q.category in PACK_LEVEL && (s?.revealed ?? 0) < EXPLORE_AT ? 3 : 1;
-    return Math.max(0.1, (1 + missRate * 2 - marks * 0.5) * theme * fresh);
+    // Темы, где пара уже угадывает всё, — реже: открытий там меньше
+    const known = s && s.revealed >= 6 && missRate === 0 ? 0.6 : 1;
+    return Math.max(0.1, (1 + missRate * 2 - marks * 0.5) * theme * fresh * known * stageWeight(flags.stage, q.layer, q.category));
   };
   return weightedPick(pool, weightOf, rnd);
 }

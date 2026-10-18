@@ -25,7 +25,15 @@ export function Button({
   );
 }
 
-export function Card({ children, className = '', tone = 'surface' }: { children: ReactNode; className?: string; tone?: 'surface' | 'accent' | 'sage' | 'rose' }) {
+export function Card({
+  children,
+  className = '',
+  tone = 'surface',
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: 'surface' | 'accent' | 'sage' | 'rose';
+}) {
   const tones = {
     surface: 'bg-surface border border-line',
     accent: 'bg-gradient-to-br from-accent/20 to-sand/10 border border-accent/30',
@@ -87,7 +95,14 @@ export function Confetti({ count = 28 }: { count?: number }) {
         <span
           key={i}
           className="confetti"
-          style={{ left: p.left, background: p.color, transform: `rotate(${p.rotate})`, ['--dx' as string]: p.dx, ['--dur' as string]: p.dur, ['--delay' as string]: p.delay }}
+          style={{
+            left: p.left,
+            background: p.color,
+            transform: `rotate(${p.rotate})`,
+            ['--dx' as string]: p.dx,
+            ['--dur' as string]: p.dur,
+            ['--delay' as string]: p.delay,
+          }}
         />
       ))}
     </>
@@ -104,7 +119,10 @@ export function Sheet({ open, onClose, children, title }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-3xl bg-surface border-t border-line p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] rise" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="w-full max-w-md rounded-t-3xl bg-surface border-t border-line p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] rise"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line" />
         {title && <h3 className="mb-3 text-lg font-semibold">{title}</h3>}
         {children}

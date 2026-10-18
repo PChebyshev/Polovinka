@@ -34,7 +34,18 @@ export function QuestionCard({
     onAnswer(choice!, g);
   };
 
-  const layerLabel = q.isCustom ? (q.authorName ? `Вопрос от: ${q.authorName}` : 'Ваш вопрос') : q.format === 'who' ? 'Кто из нас' : isScale ? 'Шкала' : LAYER_LABELS[q.layer];
+  const layerLabel =
+    q.source === 'ai'
+      ? 'По вашим ответам ✦'
+      : q.isCustom
+        ? q.authorName
+          ? `Вопрос от: ${q.authorName}`
+          : 'Ваш вопрос'
+        : q.format === 'who'
+          ? 'Кто из нас'
+          : isScale
+            ? 'Шкала'
+            : LAYER_LABELS[q.layer];
   const chosenLabel = choice === null ? '' : isScale ? `${choice} из 5` : choice === 'a' ? q.a : q.b;
 
   const options = (onPick: (v: string) => void) =>

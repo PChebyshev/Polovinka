@@ -17,7 +17,10 @@ export function LevelBar({ counters: c }: { counters: Counters }) {
         <span className="text-muted">все уровни →</span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full bg-gradient-to-r from-accent to-sand transition-all duration-700" style={{ width: `${Math.max(4, done * 100)}%` }} />
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-accent to-sand transition-all duration-700"
+          style={{ width: `${Math.max(4, done * 100)}%` }}
+        />
       </div>
       <div className="mt-2 text-xs text-muted">
         {next

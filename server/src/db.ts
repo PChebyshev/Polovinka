@@ -3,6 +3,7 @@ import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nowIso } from './ids.js';
+import { CHANGEABLE_CATEGORIES } from '../../shared/src/progress.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -23,6 +24,8 @@ export interface UserRow {
   recovery_created_at?: string | null;
   email?: string | null;
   email_verified_at?: string | null;
+  intimacy_ok?: number;
+  care_hints?: number;
 }
 
 export interface PairRow {
@@ -33,6 +36,8 @@ export interface PairRow {
   week_theme: string | null;
   created_at: string;
   deleted_at: string | null;
+  stage?: string | null;
+  has_kids?: number | null;
 }
 
 export interface QuestionRow {
@@ -49,6 +54,8 @@ export interface QuestionRow {
   topic: string | null;
   is_active: number;
   created_at: string;
+  changeable?: number;
+  source?: string | null;
 }
 
 export interface RoundRow {
@@ -115,6 +122,14 @@ function migrate() {
   // Ссылка «посоветовать друзьям»: отдельный код, не путать с приглашением в пару
   if (!has('pairs', 'ref_code')) db.exec('ALTER TABLE pairs ADD COLUMN ref_code TEXT');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS pairs_ref ON pairs(ref_code) WHERE ref_code IS NOT NULL');
+  // Профиль пары и личные настройки: стадия, дети, «Близость», подсказки заботы
+  if (!has('pairs', 'stage')) db.exec('ALTER TABLE pairs ADD COLUMN stage TEXT');
+  if (!has('pairs', 'has_kids')) db.exec('ALTER TABLE pairs ADD COLUMN has_kids INTEGER');
+  if (!has('users', 'intimacy_ok')) db.exec('ALTER TABLE users ADD COLUMN intimacy_ok INTEGER NOT NULL DEFAULT 0');
+  if (!has('users', 'care_hints')) db.exec('ALTER TABLE users ADD COLUMN care_hints INTEGER NOT NULL DEFAULT 1');
+  // Вопросы: «меняется со временем» и источник (ai — составлен по истории пары)
+  if (!has('questions', 'changeable')) db.exec('ALTER TABLE questions ADD COLUMN changeable INTEGER NOT NULL DEFAULT 0');
+  if (!has('questions', 'source')) db.exec('ALTER TABLE questions ADD COLUMN source TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS users_recovery ON users(recovery_hash) WHERE recovery_hash IS NOT NULL');
 }
 
@@ -140,22 +155,25 @@ interface SeedQuestion {
   b: string;
   topic?: string;
   whyChips?: string[];
+  changeable?: boolean;
 }
 
 function seedQuestions() {
   const list = JSON.parse(readFileSync(findQuestionsJson(), 'utf8')) as SeedQuestion[];
   const upsert = db.prepare(`
-    INSERT INTO questions (id, pair_id, author_id, layer, category, format, text, a, b, why_chips, topic, is_active, created_at)
-    VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+    INSERT INTO questions (id, pair_id, author_id, layer, category, format, text, a, b, why_chips, topic, is_active, created_at, changeable)
+    VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       layer = excluded.layer, category = excluded.category, format = excluded.format,
-      text = excluded.text, a = excluded.a, b = excluded.b, why_chips = excluded.why_chips, topic = excluded.topic
+      text = excluded.text, a = excluded.a, b = excluded.b, why_chips = excluded.why_chips, topic = excluded.topic,
+      changeable = excluded.changeable
   `);
   const ts = nowIso();
   db.exec('BEGIN');
   try {
     for (const q of list) {
-      upsert.run(q.id, q.layer, q.category, q.format ?? 'ab', q.text, q.a, q.b, q.whyChips ? JSON.stringify(q.whyChips) : null, q.topic ?? null, ts);
+      const changeable = q.changeable || CHANGEABLE_CATEGORIES.includes(q.category) ? 1 : 0;
+      upsert.run(q.id, q.layer, q.category, q.format ?? 'ab', q.text, q.a, q.b, q.whyChips ? JSON.stringify(q.whyChips) : null, q.topic ?? null, ts, changeable);
     }
     db.exec('COMMIT');
   } catch (e) {

@@ -234,3 +234,39 @@ CREATE TABLE IF NOT EXISTS email_codes (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS email_codes_email ON email_codes(email, purpose);
+
+-- «Хотим вместе»: идеи, которые пара сохранила, и отметки «сделали»
+CREATE TABLE IF NOT EXISTS ideas (
+  id TEXT PRIMARY KEY,
+  pair_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'do',
+  source TEXT NOT NULL DEFAULT 'manual',
+  round_id TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  done_at TEXT,
+  done_by TEXT,
+  removed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ideas_pair ON ideas(pair_id, created_at);
+
+-- Идеи после раскрытия: считаются один раз на раунд, чтобы оба видели одно и то же
+CREATE TABLE IF NOT EXISTS round_ideas (
+  round_id TEXT PRIMARY KEY,
+  ideas TEXT NOT NULL,
+  source TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- Подсказки заботы: кому, по какому ответу и когда показали
+CREATE TABLE IF NOT EXISTS care_hints (
+  id TEXT PRIMARY KEY,
+  pair_id TEXT NOT NULL,
+  to_user_id TEXT NOT NULL,
+  round_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  seen_at TEXT
+);
+CREATE INDEX IF NOT EXISTS care_hints_user ON care_hints(to_user_id, created_at);

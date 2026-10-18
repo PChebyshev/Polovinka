@@ -7,6 +7,7 @@ import { addDays, dateInTz } from './time.js';
 import { counters, gesturePublic, partnerOf, roundPublic } from './serialize.js';
 import { celebrationFor } from './levels.js';
 import { capsulePublic } from './routes5.js';
+import { doneIdeas } from './ideas.js';
 
 /**
  * Накопленная история пары: «В этот день», «Книга пары» и выгрузка.
@@ -56,6 +57,7 @@ function collectHistory(user: UserRow): BookEntry[] {
     ...milestones
       .filter((m) => /^(l\d+|s\d+|b:)/.test(m.key))
       .map((m) => ({ type: 'milestone' as const, at: m.reached_at, key: m.key, title: celebrationFor(m.key).title })),
+    ...doneIdeas(user.pair_id).map((i) => ({ type: 'idea' as const, at: i.doneAt!, idea: i })),
   ];
   // Ответы «других пар» в книге и выгрузке не нужны
   for (const e of entries) if (e.type === 'round') e.round.crowd = null;

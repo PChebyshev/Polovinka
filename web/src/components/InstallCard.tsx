@@ -35,9 +35,7 @@ export function InstallCard({ force = false }: { force?: boolean }) {
   return (
     <Card tone="sage" className="rise">
       <Label>На экран «Домой»</Label>
-      <p className="mt-2 text-sm text-muted">
-        {APP_NAME} будет открываться одной иконкой, и придут уведомления: утром — вопрос, вечером — раскрытие.
-      </p>
+      <p className="mt-2 text-sm text-muted">{APP_NAME} будет открываться одной иконкой, и придут уведомления: утром — вопрос, вечером — раскрытие.</p>
       {ios ? (
         <Button className="mt-3 w-full" onClick={goIos} disabled={busy}>
           Установить на экран

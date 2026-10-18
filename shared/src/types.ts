@@ -35,6 +35,47 @@ export interface PairPublic {
   tz: string;
   createdAt: string;
   isGuest: boolean;
+  /** Сколько вместе: lt1 | 1to3 | 3to10 | 10plus, null — ещё не ответили. */
+  stage: PairStage | null;
+  /** Есть ли дети: null — не ответили. */
+  hasKids: boolean | null;
+}
+
+export type PairStage = 'lt1' | '1to3' | '3to10' | '10plus';
+
+/** Личные настройки, которые влияют на вопросы и подсказки. */
+export interface Prefs {
+  /** Я согласен(на) на набор «Близость». */
+  intimacy: boolean;
+  /** Половинка согласна на набор «Близость». Набор включается, только когда оба «да». */
+  partnerIntimacy: boolean;
+  /** Можно подсказывать половинке, что меня радует. */
+  careHints: boolean;
+}
+
+/** Идея после раскрытия: сделать что-то вместе или поговорить. */
+export interface RoundIdea {
+  kind: 'do' | 'talk';
+  text: string;
+}
+
+/** Запись в списке «Хотим вместе». */
+export interface Idea {
+  id: string;
+  text: string;
+  kind: 'do' | 'talk';
+  source: 'round' | 'manual' | 'ai';
+  roundId: string | null;
+  createdBy: string;
+  createdAt: string;
+  doneAt: string | null;
+}
+
+/** Подсказка заботы: что радует половинку, по её ответам. */
+export interface CareHint {
+  id: string;
+  text: string;
+  roundId: string;
 }
 
 export type StreakDay = 'done' | 'grace' | 'missed' | 'today' | 'before';
@@ -158,6 +199,11 @@ export const CATEGORY_LABELS: Record<string, string> = {
   dreams: 'Мечты',
   values: 'Ценности',
   support: 'Поддержка',
+  money: 'Деньги',
+  roles: 'Быт и роли',
+  now: 'Что сейчас',
+  parents: 'Мы родители',
+  intimacy: 'Близость',
 };
 
 export const LAYER_LABELS: Record<Layer, string> = { light: 'Лёгкий', us: 'Про нас', deep: 'Поглубже' };
@@ -190,6 +236,8 @@ export interface RoundPublic {
     isCustom: boolean;
     /** Имя автора своего вопроса, если это не я. */
     authorName: string | null;
+    /** 'ai' — вопрос составлен по истории ответов пары. */
+    source: 'ai' | null;
   };
   /** Для «Повтора»: как пара ответила на этот вопрос в прошлый раз. */
   origin: { date: string; mine: AnswerPublic | null; partner: AnswerPublic | null } | null;
@@ -232,7 +280,8 @@ export type BookEntry =
   | { type: 'round'; at: string; round: RoundPublic }
   | { type: 'gesture'; at: string; gesture: GesturePublic }
   | { type: 'capsule'; at: string; capsule: CapsulePublic }
-  | { type: 'milestone'; at: string; key: string; title: string };
+  | { type: 'milestone'; at: string; key: string; title: string }
+  | { type: 'idea'; at: string; idea: Idea };
 
 export interface GesturePublic {
   id: string;
@@ -260,6 +309,11 @@ export interface MeResponse {
   capsule: { active: CapsulePublic | null; unreadOpened: CapsulePublic | null; canCreate: boolean };
   /** Способы вернуть доступ: код восстановления и почта. */
   access: AccessState;
+  prefs: Prefs;
+  /** Включены ли ИИ-функции на сервере: персональные идеи и вопросы по истории. */
+  ai: boolean;
+  /** Сколько идей в списке «Хотим вместе» ещё не сделано. */
+  ideasOpen: number;
 }
 
 export interface AccessState {

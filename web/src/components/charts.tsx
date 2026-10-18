@@ -50,13 +50,23 @@ export function RingMeter({ value, size = 132 }: { value: number | null; size?: 
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
         style={{ transition: 'stroke-dasharray 0.9s ease-out' }}
       />
-      <text x="50%" y="50%" dominantBaseline="central" textAnchor="middle" fill={C.text} fontSize={value === null ? 28 : value >= 100 ? 32 : 38} fontWeight={700}>
+      <text
+        x="50%"
+        y="50%"
+        dominantBaseline="central"
+        textAnchor="middle"
+        fill={C.text}
+        fontSize={value === null ? 28 : value >= 100 ? 32 : 38}
+        fontWeight={700}
+      >
         {value === null ? (
           '—'
         ) : (
           <>
             {value}
-            <tspan fontSize="0.55em" fontWeight={600} fill={C.muted}>%</tspan>
+            <tspan fontSize="0.55em" fontWeight={600} fill={C.muted}>
+              %
+            </tspan>
           </>
         )}
       </text>
@@ -178,15 +188,19 @@ export function UnderstandingLine({ weeks, onPick }: { weeks: WeekPoint[]; onPic
                 opacity={0.1}
               />
             )}
-            <polyline points={s.map((p) => `${x(p.i)},${y(p.pct)}`).join(' ')} fill="none" stroke={C.accent} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+            <polyline
+              points={s.map((p) => `${x(p.i)},${y(p.pct)}`).join(' ')}
+              fill="none"
+              stroke={C.accent}
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
           </g>
         ))}
         {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={pad.t + ih} stroke={C.muted} strokeWidth={1} />}
         {pts.map(
-          (p) =>
-            p && (
-              <circle key={p.i} cx={x(p.i)} cy={y(p.pct)} r={hover === p.i || p === last ? 5 : 4} fill={C.accent} stroke={C.surface} strokeWidth={2} />
-            ),
+          (p) => p && <circle key={p.i} cx={x(p.i)} cy={y(p.pct)} r={hover === p.i || p === last ? 5 : 4} fill={C.accent} stroke={C.surface} strokeWidth={2} />,
         )}
         {last && hover === null && (
           <text x={x(last.i) + 4} y={y(last.pct) - 12} textAnchor="end" fontSize={11} fontWeight={600} fill={C.text}>
@@ -243,7 +257,10 @@ export function WeeklyColumns({ weeks, onPick }: { weeks: WeekPoint[]; onPick: (
           const x0 = cx - bw / 2;
           const y0 = pad.t + ih - h;
           const rr = Math.min(r, h, bw / 2);
-          const d = h <= 0 ? '' : `M ${x0} ${pad.t + ih} L ${x0} ${y0 + rr} Q ${x0} ${y0} ${x0 + rr} ${y0} L ${x0 + bw - rr} ${y0} Q ${x0 + bw} ${y0} ${x0 + bw} ${y0 + rr} L ${x0 + bw} ${pad.t + ih} Z`;
+          const d =
+            h <= 0
+              ? ''
+              : `M ${x0} ${pad.t + ih} L ${x0} ${y0 + rr} Q ${x0} ${y0} ${x0 + rr} ${y0} L ${x0 + bw - rr} ${y0} Q ${x0 + bw} ${y0} ${x0 + bw} ${y0 + rr} L ${x0 + bw} ${pad.t + ih} Z`;
           const labelled = wk.discoveries > 0 && (i === weeks.length - 1 || i === maxIdx) && hover === null;
           return (
             <g key={wk.weekStart}>
@@ -253,7 +270,15 @@ export function WeeklyColumns({ weeks, onPick }: { weeks: WeekPoint[]; onPick: (
                   {wk.discoveries}
                 </text>
               )}
-              <rect x={cx - slot / 2} y={0} width={slot} height={H} fill="transparent" onMouseEnter={() => pick(i)} onClick={() => pick(hover === i ? null : i)} />
+              <rect
+                x={cx - slot / 2}
+                y={0}
+                width={slot}
+                height={H}
+                fill="transparent"
+                onMouseEnter={() => pick(i)}
+                onClick={() => pick(hover === i ? null : i)}
+              />
             </g>
           );
         })}
