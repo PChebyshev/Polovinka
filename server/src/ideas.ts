@@ -107,12 +107,15 @@ const IDEAS_SCHEMA = {
   additionalProperties: false,
 };
 
+/** «Партнёр 1/2» — служебные метки для модели, в тексте для людей их быть не должно. */
+const PARTNER_LABEL = /партн[её]р\S*\s*[12]/i;
+
 function cleanIdeas(raw: unknown): RoundIdea[] | null {
   const list = (raw as { ideas?: unknown })?.ideas;
   if (!Array.isArray(list)) return null;
   const out = list
     .map((x) => x as { kind?: unknown; text?: unknown })
-    .filter((x) => (x.kind === 'do' || x.kind === 'talk') && typeof x.text === 'string' && x.text.trim().length >= 10)
+    .filter((x) => (x.kind === 'do' || x.kind === 'talk') && typeof x.text === 'string' && x.text.trim().length >= 10 && !PARTNER_LABEL.test(x.text))
     .map((x) => ({ kind: x.kind as RoundIdea['kind'], text: (x.text as string).trim().slice(0, IDEA_MAX) }))
     .slice(0, 2);
   return out.length ? out : null;
@@ -121,7 +124,11 @@ function cleanIdeas(raw: unknown): RoundIdea[] | null {
 /** Идеи для раскрытого раунда: один раз на раунд, оба видят одно и то же. */
 async function ideasForRound(round: RoundRow, log: { warn: (s: string) => void }): Promise<{ ideas: RoundIdea[]; source: string }> {
   const cached = one<{ ideas: string; source: string }>('SELECT ideas, source FROM round_ideas WHERE round_id = ?', round.id);
-  if (cached) return { ideas: JSON.parse(cached.ideas) as RoundIdea[], source: cached.source };
+  if (cached) {
+    const list = JSON.parse(cached.ideas) as RoundIdea[];
+    if (!list.some((i) => PARTNER_LABEL.test(i.text))) return { ideas: list, source: cached.source };
+    run('DELETE FROM round_ideas WHERE round_id = ?', round.id);
+  }
 
   const q = one<QuestionRow>('SELECT * FROM questions WHERE id = ?', round.question_id)!;
   const answers = all<AnswerRow>('SELECT * FROM answers WHERE round_id = ? ORDER BY created_at', round.id);
@@ -145,11 +152,14 @@ async function ideasForRound(round: RoundRow, log: { warn: (s: string) => void }
       same
         ? 'Они выбрали одно и то же. Предложи одну идею, что сделать вместе (kind=do), и одну тему для разговора (kind=talk).'
         : 'Они выбрали по-разному. Предложи одну идею, как совместить оба выбора (kind=do), и один вопрос для разговора (kind=talk).',
-      'Каждая идея — одно-два предложения, до 200 символов, обращение к паре на «вы».',
+      'Каждая идея — одно-два предложения, до 200 символов, обращение к паре на «вы». Не называй их «Партнёр 1» и «Партнёр 2»: пиши про пару целиком.',
       q.category === 'intimacy' ? 'Тема деликатная: только нежность и романтика, без откровенностей.' : '',
     ].join('\n');
     ideas = cleanIdeas(await aiJson({ name: 'ideas', system: TONE, user, schema: IDEAS_SCHEMA }, log));
-    if (ideas) source = 'ai';
+    if (ideas) {
+      source = 'ai';
+      if (ideas.length < 2) ideas = [...ideas, ...curatedIdeas(q.category, same).filter((c) => !ideas!.some((i) => i.kind === c.kind))].slice(0, 2);
+    }
   }
   ideas ??= curatedIdeas(q.category, same);
   run('INSERT OR IGNORE INTO round_ideas (round_id, ideas, source, created_at) VALUES (?, ?, ?, ?)', round.id, JSON.stringify(ideas), source, nowIso());
@@ -194,27 +204,46 @@ async function careHintFor(user: UserRow, log: { warn: (s: string) => void }): P
   if (!theirs) return null;
   // Вопрос звучит голосом половинки: «Меня больше радует, когда ты: …»
   const said = `${renderText(q.text, partner.name, user.name)} ${lowerFirst(renderText(theirs.choice === 'a' ? q.a : q.b, partner.name, user.name))}`;
-  let text = `${partner.name} как-то ответил(а): «${said}». Может, сегодня хороший повод?`;
+  // «— это про тебя»: в цитате «ты» — это тот, кто читает подсказку
+  let text = `${partner.name} отвечал(а): «${said}» — это про тебя. Может, сегодня хороший повод?`;
   if (aiEnabled()) {
+    const quoteQ = renderText(q.text, 'Б', 'А');
+    const quoteA = lowerFirst(renderText(theirs.choice === 'a' ? q.a : q.b, 'Б', 'А'));
     const r = await aiJson<{ text?: string }>(
       {
         name: 'care',
         system: TONE,
         user: [
-          `Партнёр ответил на вопрос в приложении: «${renderText(q.text, '{partner}', 'ты')} ${lowerFirst(renderText(theirs.choice === 'a' ? q.a : q.b, '{partner}', 'ты'))}».`,
-          'Напиши одну короткую подсказку второму человеку (обращение на «ты»): как порадовать партнёра в ближайшие дни, опираясь на этот ответ.',
-          'Партнёра называй только «{partner}», в именительном падеже и в начале предложения. До 180 символов. Без восклицательных знаков подряд.',
+          'В паре два человека: А и Б. Подсказку будет читать А.',
+          `Б ответил(а) на вопрос «${quoteQ}» вариантом «${quoteA}». В этом вопросе «я», «меня», «мне» — это Б, а «ты» — это А.`,
+          'Напиши подсказку для А: что А может сделать для Б в ближайшие дни, опираясь на ответ Б.',
+          'Обращайся к А на «ты». Б называй только «{partner}», в именительном падеже. К Б не обращайся. Не используй «он», «она», «его», «её» — пол неизвестен.',
+          'Пример: «{partner} радуется, когда ты обнимаешь без повода. Сегодня хороший день, чтобы сделать это просто так.»',
+          'До 180 символов.',
         ].join('\n'),
         schema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false },
       },
       log,
     );
-    if (r?.text && r.text.length >= 20) text = r.text.trim().slice(0, IDEA_MAX).replaceAll('{partner}', partner.name);
+    if (r?.text && careTextOk(r.text)) text = r.text.trim().slice(0, IDEA_MAX).replaceAll('{partner}', partner.name);
   }
   const id = newId();
   run('INSERT INTO care_hints (id, pair_id, to_user_id, round_id, text, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, pair.id, user.id, round.id, text, nowIso());
   logEvent('care_hint', { pairId: pair.id, userId: user.id });
   return { id, text, roundId: round.id };
+}
+
+/**
+ * Подсказка пишется тому, кто заботится, а не тому, чьи это ответы.
+ * Отбрасываем ответы модели, где перепутан адресат: обращение к {partner}, «А/Б» в тексте.
+ */
+export function careTextOk(t: string): boolean {
+  const s = t.trim();
+  if (s.length < 20 || !s.includes('{partner}')) return false;
+  if (/\{partner\}\s*[,!]/.test(s)) return false;
+  if (/(^|[\s«(])[АБ]([\s,.!:»)]|$)/.test(s)) return false;
+  if (/партн[её]р/i.test(s)) return false;
+  return true;
 }
 
 function lowerFirst(s: string): string {

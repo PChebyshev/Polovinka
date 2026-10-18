@@ -130,6 +130,15 @@ function migrate() {
   // Вопросы: «меняется со временем» и источник (ai — составлен по истории пары)
   if (!has('questions', 'changeable')) db.exec('ALTER TABLE questions ADD COLUMN changeable INTEGER NOT NULL DEFAULT 0');
   if (!has('questions', 'source')) db.exec('ALTER TABLE questions ADD COLUMN source TEXT');
+  // Разовые исправления данных
+  db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
+  const once = (key: string, sql: string) => {
+    if (db.prepare('SELECT 1 FROM meta WHERE key = ?').get(key)) return;
+    db.exec(sql);
+    db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)').run(key, new Date().toISOString());
+  };
+  // Подсказки заботы до исправления промпта могли быть адресованы не тому — пересоздадутся
+  once('care_hints_v2', "DELETE FROM care_hints WHERE seen_at IS NULL");
   db.exec('CREATE INDEX IF NOT EXISTS users_recovery ON users(recovery_hash) WHERE recovery_hash IS NOT NULL');
 }
 
