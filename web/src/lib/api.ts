@@ -1,4 +1,5 @@
 import { enqueue } from './queue';
+import { storedAttr } from './attr';
 import type { BookResponse, CapsulePublic, CareHint, Idea, MemoryCard, PairStage, RoundIdea, TopicProgress } from '@polovinka/shared';
 import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
 
@@ -82,7 +83,11 @@ export function clientId(): string {
 
 export const api = {
   createUser: (name: string, joinCode?: string, challengeCode?: string, ref?: string) =>
-    request<{ token: string; me: MeResponse }>('POST', '/api/users', { name, tz: deviceTz(), joinCode, challengeCode, ref }),
+    request<{ token: string; me: MeResponse }>('POST', '/api/users', { name, tz: deviceTz(), joinCode, challengeCode, ref, attr: storedAttr() ?? undefined }),
+  createCampaign: (key: string, body: { name: string; source?: string; budget?: number }) =>
+    request<{ code: string; url: string }>('POST', `/api/campaigns?key=${encodeURIComponent(key)}`, body),
+  updateCampaign: (key: string, id: string, body: { name?: string; budget?: number | null; archived?: boolean }) =>
+    request<{ ok: true }>('PUT', `/api/campaigns/${id}?key=${encodeURIComponent(key)}`, body),
   recommend: () => request<{ code: string; url: string; host: string; image: string; title: string; description: string }>('GET', '/api/recommend'),
   recommendSent: (via: string, variant: string) => request<{ ok: true }>('POST', '/api/recommend/sent', { via, variant }),
   recommendInfo: (code: string) => request<{ names: string[]; days: number }>('GET', `/api/recommend/${encodeURIComponent(code)}`),
@@ -283,8 +288,31 @@ export interface PmfResponse {
   }>;
 }
 
+export interface CampaignStats {
+  id: string;
+  code: string;
+  name: string;
+  source: string | null;
+  url: string;
+  budget: number | null;
+  auto: boolean;
+  archived: boolean;
+  createdAt: string;
+  visits: number;
+  installs: number;
+  signups: number;
+  pairs: number;
+  revealed: number;
+  week2: number;
+  week2Base: number;
+  active7: number;
+  surveyVery: number;
+  surveyResponses: number;
+}
+
 export interface StatsResponse {
   pmf: PmfResponse;
+  ads: { campaigns: CampaignStats[]; organic: Omit<CampaignStats, 'id' | 'code' | 'url' | 'budget' | 'auto' | 'archived' | 'createdAt' | 'source' | 'name'> };
   generatedAt: string;
   periodDays: number;
   totals: { users: number; pairsComplete: number; pairsGuest: number; pairsSolo: number; pushSubscribed: number };

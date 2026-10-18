@@ -38,6 +38,7 @@ export interface PairRow {
   deleted_at: string | null;
   stage?: string | null;
   has_kids?: number | null;
+  campaign_id?: string | null;
 }
 
 export interface QuestionRow {
@@ -130,6 +131,8 @@ function migrate() {
   // Вопросы: «меняется со временем» и источник (ai — составлен по истории пары)
   if (!has('questions', 'changeable')) db.exec('ALTER TABLE questions ADD COLUMN changeable INTEGER NOT NULL DEFAULT 0');
   if (!has('questions', 'source')) db.exec('ALTER TABLE questions ADD COLUMN source TEXT');
+  // Пара пришла по рекламной кампании
+  if (!has('pairs', 'campaign_id')) db.exec('ALTER TABLE pairs ADD COLUMN campaign_id TEXT');
   // Разовые исправления данных
   db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
   const once = (key: string, sql: string) => {

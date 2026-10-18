@@ -286,3 +286,15 @@ CREATE TABLE IF NOT EXISTS survey_responses (
   missing TEXT,
   created_at TEXT NOT NULL
 );
+
+-- Рекламные кампании: уникальная ссылка /a/<code> или utm-метки (utm_key = source|campaign|content)
+CREATE TABLE IF NOT EXISTS campaigns (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  source TEXT,
+  budget INTEGER,
+  utm_key TEXT UNIQUE,
+  created_at TEXT NOT NULL,
+  archived_at TEXT
+);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, type StatsResponse } from '../lib/api';
 import { Button, Card, Label } from '../components/ui';
 import { PmfStats } from '../components/PmfStats';
+import { AdsStats } from '../components/AdsStats';
 
 const KEY = 'polovinka.statsKey';
 
@@ -137,7 +138,23 @@ export function Stats() {
         </div>
       </div>
 
+      <nav className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+        {[
+          ['#week', 'Неделя'],
+          ['#features', 'Функции'],
+          ['#pmf', 'PMF'],
+          ['#ads', 'Реклама'],
+          ['#pairs', 'Пары'],
+        ].map(([href, label]) => (
+          <a key={href} href={href} className="underline decoration-dotted">
+            {label}
+          </a>
+        ))}
+      </nav>
+
       <PmfStats pmf={data.pmf} statsKey={key} periodDays={data.periodDays} onChanged={load} />
+
+      <AdsStats ads={data.ads} statsKey={key} periodDays={data.periodDays} onChanged={load} />
 
       <Label className="mt-8">Всего</Label>
       <div className="mt-2 grid grid-cols-2 gap-2">

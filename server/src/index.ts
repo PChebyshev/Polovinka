@@ -42,7 +42,7 @@ await registerRoutes(app, { dataDir: DATA_DIR });
  * одноразовый код входа (/?h=…) должны попасть в него через start_url.
  */
 function startUrlFor(path: string, query: URLSearchParams): string {
-  const m = path.match(/^\/(j|c|f)\/([a-z0-9]{4,16})$/);
+  const m = path.match(/^\/(j|c|f|a)\/([a-z0-9]{4,16})$/);
   if (m) return `/${m[1]}/${m[2]}`;
   const h = query.get('h');
   if (path === '/install' && h && /^[A-Z0-9]{16}$/.test(h)) return `/?h=${h}`;

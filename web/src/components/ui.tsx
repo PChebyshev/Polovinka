@@ -29,10 +29,12 @@ export function Card({
   children,
   className = '',
   tone = 'surface',
+  id,
 }: {
   children: ReactNode;
   className?: string;
   tone?: 'surface' | 'accent' | 'sage' | 'rose';
+  id?: string;
 }) {
   const tones = {
     surface: 'bg-surface border border-line',
@@ -40,7 +42,11 @@ export function Card({
     sage: 'bg-gradient-to-br from-sage/20 to-sage/5 border border-sage/30',
     rose: 'bg-gradient-to-br from-rose/20 to-rose/5 border border-rose/30',
   };
-  return <div className={`rounded-3xl p-5 ${tones[tone]} ${className}`}>{children}</div>;
+  return (
+    <div id={id} className={`rounded-3xl p-5 ${tones[tone]} ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function Chip({ active = false, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
@@ -56,8 +62,12 @@ export function Chip({ active = false, children, ...rest }: ButtonHTMLAttributes
   );
 }
 
-export function Label({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`text-xs uppercase tracking-wider text-muted ${className}`}>{children}</div>;
+export function Label({ children, className = '', id }: { children: ReactNode; className?: string; id?: string }) {
+  return (
+    <div id={id} className={`text-xs uppercase tracking-wider text-muted ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function Spinner() {

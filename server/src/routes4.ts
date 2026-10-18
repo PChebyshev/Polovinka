@@ -7,6 +7,7 @@ import { requireUser } from './auth.js';
 import { pushEnabled, pushPublicKey, sendTestPush } from './push.js';
 import { computeStats } from './stats.js';
 import { computePmf, registerPmfRoutes, TRACKED_SCREENS } from './pmf.js';
+import { campaignBase, computeCampaigns, registerCampaignRoutes } from './campaigns.js';
 
 function keyOk(given: unknown): boolean {
   const expected = process.env.STATS_KEY ?? '';
@@ -167,8 +168,9 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
     const key = q.key ?? (req.headers['x-stats-key'] as string | undefined);
     if (!keyOk(key)) return reply.code(401).send({ error: 'stats_key' });
     const days = Math.min(365, Math.max(7, Number(q.days ?? 30) || 30));
-    return { ...computeStats(days), pmf: computePmf(days) };
+    return { ...computeStats(days), pmf: computePmf(days), ads: computeCampaigns(campaignBase(req), days) };
   });
 
   await registerPmfRoutes(app, { keyOk, meResponse: deps.meResponse });
+  await registerCampaignRoutes(app, { keyOk });
 }

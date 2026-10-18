@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from './lib/store';
 import { Onboarding } from './screens/Onboarding';
 import { Home } from './screens/Home';
@@ -23,6 +23,7 @@ import { Topics } from './screens/Topics';
 import { Capsule } from './screens/Capsule';
 import { isStandalone, syncManifest } from './lib/install';
 import { getToken, trackScreen } from './lib/api';
+import { captureAttribution } from './lib/attr';
 import { CelebrationOverlay } from './components/Celebration';
 import { Spinner, Heart } from './components/ui';
 import { GestureCard } from './components/GestureToast';
@@ -150,6 +151,14 @@ function Shell() {
     syncManifest(loc.pathname, loc.search);
   }, [loc.pathname, loc.search]);
 
+  // Рекламный переход: /a/<код> или utm-метки. utm-ссылку переводим в /a/<код>, чтобы метка пережила установку на экран
+  useEffect(() => {
+    void captureAttribution(loc.pathname, loc.search).then((code) => {
+      if (code && !me && loc.pathname === '/') nav(`/a/${code}`, { replace: true });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loc.pathname, loc.search]);
+
   // Какие экраны открывают — для статистики функций
   useEffect(() => {
     if (!me) return;
@@ -197,6 +206,7 @@ function Shell() {
         <Route path="/capsule" element={<Capsule />} />
         <Route path="/j/:code" element={<Join />} />
         <Route path="/f/:code" element={<Friend />} />
+        <Route path="/a/:code" element={<Navigate to="/" replace />} />
         <Route path="/recommend" element={<Recommend />} />
         <Route path="/book" element={<Book />} />
         <Route path="/ideas" element={<Ideas />} />

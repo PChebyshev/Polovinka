@@ -21,6 +21,7 @@ import { registerMemoryRoutes } from './memories.js';
 import { registerIdeaRoutes, ideasOpen, prefsFor } from './ideas.js';
 import { aiEnabled } from './ai.js';
 import { surveyDue, trackAppOpen } from './pmf.js';
+import { campaignForSignup } from './campaigns.js';
 import { pushReveal, pushPartnerAnswered } from './push.js';
 import { guessHit } from './score.js';
 
@@ -108,7 +109,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   // --- Аккаунт -------------------------------------------------------------
 
   app.post('/api/users', async (req, reply) => {
-    const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; joinCode?: unknown; challengeCode?: unknown; ref?: unknown };
+    const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; joinCode?: unknown; challengeCode?: unknown; ref?: unknown; attr?: unknown };
     const name = cleanName(body.name);
     if (!name) return reply.code(400).send({ error: 'name' });
     const tz = isValidTz(body.tz) ? body.tz : 'Europe/Moscow';
@@ -132,7 +133,15 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
       if (!challenge) return reply.code(404).send({ error: 'not_found' });
       pair = createSoloPair(tz, true);
     }
-    if (!pair) pair = createSoloPair(tz);
+    if (!pair) {
+      pair = createSoloPair(tz);
+      // Первый человек пары пришёл по рекламе — пара засчитывается кампании; партнёр по приглашению идёт туда же
+      const campaignId = campaignForSignup(body.attr);
+      if (campaignId) {
+        run('UPDATE pairs SET campaign_id = ? WHERE id = ?', campaignId, pair.id);
+        logEvent('ad_signup', { pairId: pair.id, meta: { campaign: campaignId } });
+      }
+    }
 
     run(
       'INSERT INTO users (id, name, token_hash, pair_id, tz, created_at) VALUES (?, ?, ?, ?, ?, ?)',

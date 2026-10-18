@@ -136,9 +136,9 @@ function CohortTable({ cohorts }: { cohorts: PmfResponse['cohorts'] }) {
   );
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+function Section({ title, hint, children, id }: { title: string; hint?: string; children: ReactNode; id?: string }) {
   return (
-    <Card className="mt-3">
+    <Card className="mt-3 scroll-mt-4" id={id}>
       <Label>{title}</Label>
       {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
       <div className="mt-3">{children}</div>
@@ -196,7 +196,7 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
         )}
       </div>
 
-      <Label className="mt-6">Последние 7 дней</Label>
+      <Label className="mt-6 scroll-mt-4" id="week">Последние 7 дней</Label>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Tile n={`${w.activePairs} из ${w.completePairs}`} label="пар отвечали" />
         <Tile n={w.medianDaysActive === null ? '—' : String(w.medianDaysActive)} label="дней с ответами у пары" hint="медиана среди активных" />
@@ -217,6 +217,7 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
       </Section>
 
       <Section
+        id="features"
         title={`Функции за ${periodDays} дн.`}
         hint="Сколько пар пользовались и какая это доля активных. «Удержание» — доля пар старше 14 дней, активных на этой неделе: среди пользовавшихся функцией и остальных."
       >
@@ -246,7 +247,7 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
         </div>
       </Section>
 
-      <Label className="mt-6">Product–market fit</Label>
+      <Label className="mt-6 scroll-mt-4" id="pmf">Product–market fit</Label>
 
       <Section title="Опрос: «Если бы Половинка исчезла…»" hint="Тест Шона Эллиса. Цель — 40% и больше отвечают «очень расстроюсь».">
         {s.responses === 0 ? (
@@ -322,7 +323,7 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
         </Section>
       )}
 
-      <Section title={`Пары · ${pmf.pairs.length}`} hint="За последние 7 дней. «Функций» — сколько разных функций пара пробовала за всё время.">
+      <Section id="pairs" title={`Пары · ${pmf.pairs.length}`} hint="За последние 7 дней. «Функций» — сколько разных функций пара пробовала за всё время.">
         <div className="space-y-2">
           {pmf.pairs.map((p) => (
             <div key={p.pairId} className="rounded-2xl bg-surface-2 px-3 py-2 text-xs">
