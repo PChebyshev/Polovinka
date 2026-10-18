@@ -6,6 +6,7 @@ import { randomInt } from 'node:crypto';
 import { requireUser } from './auth.js';
 import { pushEnabled, pushPublicKey, sendTestPush } from './push.js';
 import { computeStats } from './stats.js';
+import { computePmf, registerPmfRoutes, TRACKED_SCREENS } from './pmf.js';
 
 function keyOk(given: unknown): boolean {
   const expected = process.env.STATS_KEY ?? '';
@@ -129,8 +130,16 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
   /** События с клиента: подсказка «на экран», установка. */
   app.post('/api/events', { preHandler: requireUser }, async (req, reply) => {
     const user = req.user!;
-    const body = (req.body ?? {}) as { type?: unknown };
+    const body = (req.body ?? {}) as { type?: unknown; name?: unknown };
+    // Просмотр экрана: только из списка, имя — в meta
+    if (body.type === 'screen') {
+      if (typeof body.name !== 'string' || !TRACKED_SCREENS.includes(body.name)) return reply.code(400).send({ error: 'name' });
+      logEvent('screen', { pairId: user.pair_id, userId: user.id, meta: { name: body.name } });
+      return { ok: true };
+    }
     const allowed = new Set([
+      'survey_shown',
+      'survey_dismissed',
       'install_prompt_shown',
       'install_accepted',
       'install_dismissed',
@@ -158,6 +167,8 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
     const key = q.key ?? (req.headers['x-stats-key'] as string | undefined);
     if (!keyOk(key)) return reply.code(401).send({ error: 'stats_key' });
     const days = Math.min(365, Math.max(7, Number(q.days ?? 30) || 30));
-    return computeStats(days);
+    return { ...computeStats(days), pmf: computePmf(days) };
   });
+
+  await registerPmfRoutes(app, { keyOk, meResponse: deps.meResponse });
 }

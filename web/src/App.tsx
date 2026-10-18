@@ -22,7 +22,7 @@ import { Levels } from './screens/Levels';
 import { Topics } from './screens/Topics';
 import { Capsule } from './screens/Capsule';
 import { isStandalone, syncManifest } from './lib/install';
-import { getToken } from './lib/api';
+import { getToken, trackScreen } from './lib/api';
 import { CelebrationOverlay } from './components/Celebration';
 import { Spinner, Heart } from './components/ui';
 import { GestureCard } from './components/GestureToast';
@@ -96,7 +96,9 @@ function Toast() {
 
 function Celebrations() {
   const { me, refresh } = useStore();
-  if (!me || me.celebrations.length === 0) return null;
+  const loc = useLocation();
+  // На служебных и публичных страницах поздравления не показываем
+  if (!me || me.celebrations.length === 0 || ['/stats', '/privacy', '/w/', '/f/', '/j/'].some((p) => loc.pathname.startsWith(p))) return null;
   const c = me.celebrations[0];
   const close = async () => {
     await api.milestoneSeen(c.key).catch(() => undefined);
@@ -147,6 +149,15 @@ function Shell() {
   useEffect(() => {
     syncManifest(loc.pathname, loc.search);
   }, [loc.pathname, loc.search]);
+
+  // Какие экраны открывают — для статистики функций
+  useEffect(() => {
+    if (!me) return;
+    const tab = new URLSearchParams(loc.search).get('tab');
+    const p = loc.pathname;
+    const name = p === '/history' ? (tab === 'topics' ? 'topics' : 'history') : p === '/topics' ? 'topics' : p.slice(1);
+    if (['history', 'topics', 'ideas', 'book', 'levels', 'capsule', 'week', 'recommend', 'settings', 'gesture'].includes(name)) trackScreen(name);
+  }, [loc.pathname, loc.search, me]);
 
   // Запуск с иконки: приложение могло стартовать со ссылки-приглашения, после входа — на главную.
   useEffect(() => {

@@ -270,3 +270,19 @@ CREATE TABLE IF NOT EXISTS care_hints (
   seen_at TEXT
 );
 CREATE INDEX IF NOT EXISTS care_hints_user ON care_hints(to_user_id, created_at);
+
+-- Пары, которые не учитываются в статистике (свои, тестовые)
+CREATE TABLE IF NOT EXISTS stats_exclude (
+  pair_id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL
+);
+
+-- Опрос «Как бы вы расстроились, если бы Половинка исчезла?» — один ответ на человека
+CREATE TABLE IF NOT EXISTS survey_responses (
+  user_id TEXT PRIMARY KEY,
+  pair_id TEXT NOT NULL,
+  disappoint TEXT NOT NULL,
+  benefit TEXT,
+  missing TEXT,
+  created_at TEXT NOT NULL
+);

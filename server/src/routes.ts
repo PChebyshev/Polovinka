@@ -20,6 +20,7 @@ import { registerRecommendRoutes, refPair } from './recommend.js';
 import { registerMemoryRoutes } from './memories.js';
 import { registerIdeaRoutes, ideasOpen, prefsFor } from './ideas.js';
 import { aiEnabled } from './ai.js';
+import { surveyDue, trackAppOpen } from './pmf.js';
 import { pushReveal, pushPartnerAnswered } from './push.js';
 import { guessHit } from './score.js';
 
@@ -88,6 +89,7 @@ function meResponse(user: UserRow): MeResponse {
     prefs: prefsFor(user),
     ai: aiEnabled(),
     ideasOpen: ideasOpen(pair.id),
+    surveyDue: surveyDue(user),
   };
 }
 
@@ -159,7 +161,10 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     return { token, me: meResponse(user) };
   });
 
-  app.get('/api/me', { preHandler: requireUser }, async (req) => meResponse(req.user!));
+  app.get('/api/me', { preHandler: requireUser }, async (req) => {
+    trackAppOpen(req.user!);
+    return meResponse(req.user!);
+  });
 
   await registerStage2Routes(app, { meResponse });
   await registerStage3Routes(app, { meResponse, dataDir: opts.dataDir });

@@ -179,6 +179,10 @@ export const api = {
   emailLoginConfirm: (email: string, code: string) => request<{ token: string; me: MeResponse }>('POST', '/api/email/login/confirm', { email, code }),
   pushTest: () => request<{ sent: number; failed: number; statuses: number[]; reasons?: string[]; tooSoon?: boolean; disabled?: boolean }>('POST', '/api/push/test'),
   stats: (key: string, days: number) => request<StatsResponse>('GET', `/api/stats?key=${encodeURIComponent(key)}&days=${days}`),
+  statsExcludeMe: (key: string) => request<{ ok: true }>('POST', `/api/stats/exclude-me?key=${encodeURIComponent(key)}`, {}),
+  statsExclude: (key: string, pairId: string) => request<{ ok: true }>('POST', `/api/stats/exclude/${pairId}?key=${encodeURIComponent(key)}`, {}),
+  statsInclude: (key: string, pairId: string) => request<{ ok: true }>('DELETE', `/api/stats/exclude/${pairId}?key=${encodeURIComponent(key)}`),
+  survey: (body: { disappoint: 'very' | 'somewhat' | 'not'; benefit?: string; missing?: string }) => request<MeResponse>('POST', '/api/survey', body),
 };
 
 export interface AppConfig {
@@ -225,7 +229,62 @@ function track(type: string): Promise<unknown> {
   return request('POST', '/api/events', { type }).catch(() => undefined);
 }
 
+const SCREEN_EVERY_MS = 10 * 60_000;
+/** Просмотр экрана для статистики: не чаще раза в 10 минут на экран. */
+export function trackScreen(name: string) {
+  try {
+    const k = `polovinka.screen.${name}`;
+    const last = Number(sessionStorage.getItem(k) ?? 0);
+    if (Date.now() - last < SCREEN_EVERY_MS) return;
+    sessionStorage.setItem(k, String(Date.now()));
+  } catch {
+    /* приватный режим — всё равно отправим */
+  }
+  void request('POST', '/api/events', { type: 'screen', name }).catch(() => undefined);
+}
+
+export interface PmfResponse {
+  excluded: Array<{ pairId: string; names: string[] }>;
+  week: {
+    activePairs: number;
+    completePairs: number;
+    medianDaysActive: number | null;
+    medianSessions: number | null;
+    activeUsers: number;
+    daysHistogram: number[];
+    sessionsHistogram: Array<{ label: string; n: number }>;
+  };
+  weekly: Array<{ weekStart: string; activePairs: number; completePairs: number; sessions: number }>;
+  features: Array<{ key: string; label: string; pairs: number; share: number | null; events: number; liftUsers: number; liftUsed: number | null; liftOthers: number | null }>;
+  cohorts: Array<{ weekStart: string; size: number; weeks: Array<number | null> }>;
+  activation: Array<[string, number]>;
+  stages: Array<{ stage: string; pairs: number; activeShare: number | null; avgDays: number | null }>;
+  survey: {
+    responses: number;
+    shown: number;
+    very: number;
+    somewhat: number;
+    not: number;
+    veryShare: number | null;
+    byStage: Array<{ stage: string; responses: number; veryShare: number | null }>;
+    texts: Array<{ at: string; disappoint: string; stage: string; benefit: string | null; missing: string | null }>;
+  };
+  pairs: Array<{
+    pairId: string;
+    names: string[];
+    joinedAt: string;
+    stage: string | null;
+    hasKids: boolean | null;
+    daysActive7: number;
+    sessions7: number;
+    discoveries: number;
+    lastActive: string | null;
+    features: number;
+  }>;
+}
+
 export interface StatsResponse {
+  pmf: PmfResponse;
   generatedAt: string;
   periodDays: number;
   totals: { users: number; pairsComplete: number; pairsGuest: number; pairsSolo: number; pushSubscribed: number };

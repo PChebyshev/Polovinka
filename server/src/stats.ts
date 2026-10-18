@@ -1,5 +1,6 @@
 import { all, one } from './db.js';
 import { addDays } from './time.js';
+import { notExcluded } from './pmf.js';
 
 export interface StatsResponse {
   generatedAt: string;
@@ -47,7 +48,7 @@ export interface StatsResponse {
 }
 
 function count(type: string, since: string): number {
-  return Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM events WHERE type = ? AND created_at >= ?', type, since)?.n ?? 0);
+  return Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM events WHERE type = ? AND created_at >= ? AND ${notExcluded('pair_id')}`, type, since)?.n ?? 0);
 }
 
 export function computeStats(periodDays = 30): StatsResponse {
@@ -55,11 +56,11 @@ export function computeStats(periodDays = 30): StatsResponse {
   const sinceDate = addDays(today, -periodDays);
   const since = `${sinceDate}T00:00:00.000Z`;
 
-  const users = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM users')?.n ?? 0);
-  const pairsComplete = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users GROUP BY pair_id HAVING COUNT(*) >= 2)')?.n ?? 0);
-  const pairsGuest = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM pairs WHERE is_guest = 1')?.n ?? 0);
-  const pairsSolo = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users GROUP BY pair_id HAVING COUNT(*) = 1)')?.n ?? 0);
-  const pushSubscribed = Number(one<{ n: number }>('SELECT COUNT(DISTINCT user_id) AS n FROM push_subscriptions')?.n ?? 0);
+  const users = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE ${notExcluded('pair_id')}`)?.n ?? 0);
+  const pairsComplete = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) >= 2)`)?.n ?? 0);
+  const pairsGuest = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM pairs WHERE is_guest = 1 AND ${notExcluded('id')}`)?.n ?? 0);
+  const pairsSolo = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) = 1)`)?.n ?? 0);
+  const pushSubscribed = Number(one<{ n: number }>(`SELECT COUNT(DISTINCT s.user_id) AS n FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE ${notExcluded('u.pair_id')}`)?.n ?? 0);
 
   const funnel = {
     invitesSent: count('invite_sent', since),
@@ -80,7 +81,7 @@ export function computeStats(periodDays = 30): StatsResponse {
     refSignups: count('ref_signup', since),
   };
 
-  const usersInPeriod = Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', since)?.n ?? 0) || users;
+  const usersInPeriod = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE created_at >= ? AND ${notExcluded('pair_id')}`, since)?.n ?? 0) || users;
   const shares = funnel.invitesSent + funnel.challengesSent + funnel.weeklyShared + funnel.refShared;
   const converted = funnel.invitesAccepted + funnel.challengePairsCreated * 2 + funnel.refSignups;
   const sharesPerUser = usersInPeriod ? shares / usersInPeriod : 0;
@@ -88,7 +89,7 @@ export function computeStats(periodDays = 30): StatsResponse {
   const kFactor = { sharesPerUser: round(sharesPerUser), conversion: round(conversion), k: round(sharesPerUser * conversion) };
 
   // Близость: только полные пары, последние periodDays дней.
-  const completePairs = all<{ pair_id: string }>('SELECT pair_id FROM users GROUP BY pair_id HAVING COUNT(*) >= 2').map((r) => r.pair_id);
+  const completePairs = all<{ pair_id: string }>(`SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) >= 2`).map((r) => r.pair_id);
   let daysAny = 0;
   let daysBoth = 0;
   let revealedAnswers = 0;
@@ -129,8 +130,8 @@ export function computeStats(periodDays = 30): StatsResponse {
     const d = addDays(today, -i);
     const from = `${d}T00:00:00.000Z`;
     const to = `${addDays(d, 1)}T00:00:00.000Z`;
-    const ev = (type: string) => Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM events WHERE type = ? AND created_at >= ? AND created_at < ?', type, from, to)?.n ?? 0);
-    const u = Number(one<{ n: number }>('SELECT COUNT(DISTINCT user_id) AS n FROM events WHERE user_id IS NOT NULL AND created_at >= ? AND created_at < ?', from, to)?.n ?? 0);
+    const ev = (type: string) => Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM events WHERE type = ? AND created_at >= ? AND created_at < ? AND ${notExcluded('pair_id')}`, type, from, to)?.n ?? 0);
+    const u = Number(one<{ n: number }>(`SELECT COUNT(DISTINCT user_id) AS n FROM events WHERE user_id IS NOT NULL AND created_at >= ? AND created_at < ? AND ${notExcluded('pair_id')}`, from, to)?.n ?? 0);
     daily.push({ date: d, answers: ev('answer'), reveals: ev('reveal'), gestures: ev('gesture_sent'), users: u });
   }
 

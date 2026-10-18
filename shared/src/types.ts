@@ -314,6 +314,8 @@ export interface MeResponse {
   ai: boolean;
   /** Сколько идей в списке «Хотим вместе» ещё не сделано. */
   ideasOpen: number;
+  /** Пора показать короткий опрос о Половинке. */
+  surveyDue: boolean;
 }
 
 export interface AccessState {

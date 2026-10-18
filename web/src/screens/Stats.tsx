@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, type StatsResponse } from '../lib/api';
 import { Button, Card, Label } from '../components/ui';
+import { PmfStats } from '../components/PmfStats';
 
 const KEY = 'polovinka.statsKey';
 
@@ -136,7 +137,9 @@ export function Stats() {
         </div>
       </div>
 
-      <Label className="mt-5">Всего</Label>
+      <PmfStats pmf={data.pmf} statsKey={key} periodDays={data.periodDays} onChanged={load} />
+
+      <Label className="mt-8">Всего</Label>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Tile n={String(t.users)} label="пользователей" />
         <Tile n={String(t.pairsComplete)} label="полных пар" hint={`одиночных ${t.pairsSolo}, гостевых ${t.pairsGuest}`} />
