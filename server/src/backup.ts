@@ -31,7 +31,16 @@ export interface S3Config {
 const clean = (v: string | undefined) => (v ?? '').trim().replace(/^["'‘’“”«»]+|["'‘’“”«»]+$/g, '');
 
 export function backupConfig(): S3Config | null {
-  const bucket = clean(process.env.BACKUP_S3_BUCKET);
+  // Имена бакетов — только строчные; телефон любит ставить заглавную первую букву.
+  // Принимаем и вставленную ссылку: s3://имя, https://storage.yandexcloud.net/имя, имя.storage.yandexcloud.net
+  const bucket = clean(process.env.BACKUP_S3_BUCKET)
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/^s3:\/\//, '')
+    .replace(/^https?:\/\/[^/]*storage[^/]*\//, '')
+    .replace(/\.storage\.yandexcloud\.net.*$/, '')
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '');
   const keyId = clean(process.env.BACKUP_S3_KEY_ID);
   const secret = clean(process.env.BACKUP_S3_SECRET);
   const password = clean(process.env.BACKUP_PASSWORD);
@@ -101,10 +110,11 @@ async function s3(c: S3Config, method: 'PUT' | 'GET', key: string, body?: Buffer
 }
 
 /** Понятная причина ошибки хранилища. */
-async function explain(r: Response): Promise<string> {
+async function explain(r: Response, c: S3Config): Promise<string> {
   const text = await r.text().catch(() => '');
   const code = text.match(/<Code>([^<]+)<\/Code>/)?.[1] ?? '';
-  if (code === 'NoSuchBucket') return 'бакет не найден: проверьте BACKUP_S3_BUCKET';
+  if (code === 'NoSuchBucket')
+    return `бакет «${c.bucket}» не найден в ${c.endpoint}. Сравните с именем в консоли (Object Storage → Бакеты) — должно совпадать буква в букву`;
   if (code === 'InvalidAccessKeyId') return 'ключ не найден: проверьте BACKUP_S3_KEY_ID';
   if (code === 'SignatureDoesNotMatch') return 'неверный секретный ключ: проверьте BACKUP_S3_SECRET';
   if (code === 'AccessDenied' || r.status === 403) return 'нет прав: дайте сервисному аккаунту роль storage.uploader (для restore/list — storage.viewer)';
@@ -177,7 +187,7 @@ export async function makeBackup(dataDir: string): Promise<{ key: string; size: 
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
     const key = `backups/polovinka-${stamp}.db.gz.enc`;
     const r = await s3(c, 'PUT', key, file);
-    if (!r.ok) throw new Error(await explain(r));
+    if (!r.ok) throw new Error(await explain(r, c));
     setMeta('backup_last_at', new Date().toISOString());
     setMeta('backup_last_key', key);
     setMeta('backup_last_size', String(file.length));
@@ -241,7 +251,7 @@ async function cli() {
     console.log(`✅ Копия отправлена: ${c.bucket}/${r.key}, ${Math.round(r.size / 1024)} КБ`);
   } else if (cmd === 'list') {
     const r = await s3(c, 'GET', '', undefined, 'list-type=2&prefix=backups%2F');
-    if (!r.ok) throw new Error(await explain(r));
+    if (!r.ok) throw new Error(await explain(r, c));
     const xml = await r.text();
     const items = [...xml.matchAll(/<Key>([^<]+)<\/Key>[\s\S]*?<Size>(\d+)<\/Size>/g)].map((m) => [m[1], Number(m[2])] as const);
     for (const [k, size] of items.slice(-15)) console.log(`  ${k}  ${Math.round(size / 1024)} КБ`);
@@ -249,7 +259,7 @@ async function cli() {
   } else if (cmd === 'restore' && arg) {
     const key = arg.startsWith('backups/') ? arg : `backups/${arg}`;
     const r = await s3(c, 'GET', key);
-    if (!r.ok) throw new Error(await explain(r));
+    if (!r.ok) throw new Error(await explain(r, c));
     const db = gunzipSync(decrypt(Buffer.from(await r.arrayBuffer()), c.password));
     const target = out ?? join(dataDir, 'polovinka-restored.db');
     writeFileSync(target, db);
