@@ -155,6 +155,7 @@ export const api = {
   repeat: () => request<RoundPublic>('POST', '/api/rounds/repeat'),
   capsules: () => request<{ prompts: string[]; capsules: CapsulePublic[]; level: number; terms: number[]; canCreate: boolean }>('GET', '/api/capsules'),
   createCapsule: (prompt: string, days: number) => request<CapsulePublic>('POST', '/api/capsules', { prompt, days }),
+  hideChallenge: (code: string) => request<MeResponse>('POST', `/api/challenges/${code}/hide`, {}),
   memory: () => request<{ memory: MemoryCard | null }>('GET', '/api/memory'),
   setProfile: (patch: { stage?: PairStage | null; hasKids?: boolean | null }) => request<MeResponse>('PUT', '/api/pair/profile', patch),
   setPrefs: (patch: { intimacy?: boolean; careHints?: boolean }) => request<MeResponse>('PUT', '/api/me/prefs', patch),

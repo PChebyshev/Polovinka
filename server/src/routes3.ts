@@ -164,10 +164,22 @@ export function joinChallenge(ch: ChallengeRow, pair: PairRow) {
   ensureChallengeRounds(pair.id, ch.id, JSON.parse(ch.question_ids) as string[], pair.tz);
 }
 
+const CHALLENGE_SHOW_DAYS = 14;
+
 export function myChallenges(user: UserRow): MyChallenge[] {
-  const sent = all<ChallengeRow>('SELECT * FROM challenges WHERE from_pair_id = ? ORDER BY created_at DESC LIMIT 5', user.pair_id);
+  // На главной — только за последние 14 дней и не скрытые парой
+  const since = new Date(Date.now() - CHALLENGE_SHOW_DAYS * 86_400_000).toISOString();
+  const notHidden = 'NOT EXISTS (SELECT 1 FROM challenge_hidden h WHERE h.pair_id = ? AND h.challenge_id = c.id)';
+  const sent = all<ChallengeRow>(
+    `SELECT c.* FROM challenges c WHERE c.from_pair_id = ? AND c.created_at >= ? AND ${notHidden} ORDER BY c.created_at DESC LIMIT 5`,
+    user.pair_id,
+    since,
+    user.pair_id,
+  );
   const received = all<ChallengeRow>(
-    'SELECT c.* FROM challenges c JOIN challenge_pairs p ON p.challenge_id = c.id WHERE p.pair_id = ? ORDER BY p.created_at DESC LIMIT 5',
+    `SELECT c.* FROM challenges c JOIN challenge_pairs p ON p.challenge_id = c.id WHERE p.pair_id = ? AND p.created_at >= ? AND ${notHidden} ORDER BY p.created_at DESC LIMIT 5`,
+    user.pair_id,
+    since,
     user.pair_id,
   );
   const out: MyChallenge[] = [];
@@ -183,6 +195,16 @@ export function myChallenges(user: UserRow): MyChallenge[] {
 export async function registerStage3Routes(app: FastifyInstance, deps: Deps) {
   mkdirSync(join(deps.dataDir, 'cards'), { recursive: true });
   app.addContentTypeParser('image/png', { parseAs: 'buffer', bodyLimit: 3 * 1024 * 1024 }, (_req, body, done) => done(null, body));
+
+  /** Скрыть вызов с главной — для обоих в паре. Страница вызова по ссылке остаётся. */
+  app.post('/api/challenges/:code/hide', { preHandler: requireUser }, async (req, reply) => {
+    const user = req.user!;
+    const ch = one<ChallengeRow>('SELECT * FROM challenges WHERE code = ?', String((req.params as { code: string }).code).toLowerCase());
+    if (!ch) return reply.code(404).send({ error: 'not_found' });
+    run('INSERT OR IGNORE INTO challenge_hidden (pair_id, challenge_id, created_at) VALUES (?, ?, ?)', user.pair_id, ch.id, nowIso());
+    sendTo(partnerOf(user)?.id, { type: 'pair_updated' });
+    return deps.meResponse(one<UserRow>('SELECT * FROM users WHERE id = ?', user.id)!);
+  });
 
   // --- Итог недели --------------------------------------------------------------
 

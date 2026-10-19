@@ -298,3 +298,11 @@ CREATE TABLE IF NOT EXISTS campaigns (
   created_at TEXT NOT NULL,
   archived_at TEXT
 );
+
+-- Вызовы, которые пара скрыла с главной
+CREATE TABLE IF NOT EXISTS challenge_hidden (
+  pair_id TEXT NOT NULL,
+  challenge_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (pair_id, challenge_id)
+);

@@ -23,7 +23,7 @@ import { StreakBar } from '../components/StreakBar';
 import { Link } from 'react-router-dom';
 
 export function Home() {
-  const { me, today, setToday, refresh, error, offline } = useStore();
+  const { me, today, setToday, setMe, refresh, error, offline } = useStore();
   const [busy, setBusy] = useState(false);
   const [bonusBusy, setBonusBusy] = useState(false);
   const [queuedNote, setQueuedNote] = useState(false);
@@ -178,14 +178,25 @@ export function Home() {
         ))}
 
         {me.challenges.map((ch) => (
-          <Link key={ch.code} to={`/c/${ch.code}`} className="block rounded-2xl border border-accent/40 bg-accent/10 px-4 py-3">
-            <div className="text-xs uppercase tracking-wider text-muted">
-              {ch.isSender ? 'Ваш вызов' : `Вызов от ${ch.fromNames[1] ? `${ch.fromNames[0]} и ${ch.fromNames[1]}` : ch.fromNames[0]}`}
-            </div>
-            <div className="mt-1 text-sm">
-              {ch.answered < ch.total ? `Пройдено ${ch.answered} из ${ch.total}` : ch.otherJoined ? 'Сравнение готово' : 'Ждём вторую пару'} →
-            </div>
-          </Link>
+          <div key={ch.code} className="flex items-start gap-2 rounded-2xl border border-accent/40 bg-accent/10 py-3 pl-4 pr-2">
+            <Link to={`/c/${ch.code}`} className="min-w-0 flex-1">
+              <div className="text-xs uppercase tracking-wider text-muted">
+                {ch.isSender ? 'Ваш вызов' : `Вызов от ${ch.fromNames[1] ? `${ch.fromNames[0]} и ${ch.fromNames[1]}` : ch.fromNames[0]}`}
+              </div>
+              <div className="mt-1 text-sm">
+                {ch.answered < ch.total ? `Пройдено ${ch.answered} из ${ch.total}` : ch.otherJoined ? 'Сравнение готово' : 'Ждём вторую пару'} →
+              </div>
+            </Link>
+            <button
+              className="shrink-0 px-2 py-1 text-sm text-muted"
+              aria-label="Скрыть вызов"
+              onClick={async () => {
+                setMe(await api.hideChallenge(ch.code));
+              }}
+            >
+              ✕
+            </button>
+          </div>
         ))}
 
         {me.pair.isGuest && (
