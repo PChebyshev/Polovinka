@@ -43,3 +43,36 @@ export function choiceLabel(q: { format: string; a: string; b: string }, choice:
   if (q.format === 'scale') return `${choice} из 5`;
   return choice === 'a' ? q.a : q.b;
 }
+
+/** Сегодняшняя дата YYYY-MM-DD по часам телефона. */
+export function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function addDaysLocal(date: string, n: number): string {
+  const d = new Date(`${date}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** «сегодня», «завтра», «в субботу», «25 октября» — для планов. */
+export function relDay(date: string, today = todayLocal()): string {
+  const diff = Math.round((new Date(`${date}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 86_400_000);
+  if (diff === 0) return 'сегодня';
+  if (diff === 1) return 'завтра';
+  if (diff === 2) return 'послезавтра';
+  if (diff === -1) return 'вчера';
+  const d = new Date(`${date}T12:00:00`);
+  if (diff > 2 && diff < 7) {
+    const wd = ['в воскресенье', 'в понедельник', 'во вторник', 'в среду', 'в четверг', 'в пятницу', 'в субботу'][d.getDay()];
+    return wd;
+  }
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+}
+
+/** Ближайшая суббота (если сегодня суббота — сегодня). */
+export function nextSaturday(today = todayLocal()): string {
+  const wd = new Date(`${today}T12:00:00`).getDay();
+  return addDaysLocal(today, (6 - wd + 7) % 7);
+}

@@ -18,7 +18,7 @@ import { registerStage4Routes } from './routes4.js';
 import { registerAccessRoutes, accessState } from './access.js';
 import { registerRecommendRoutes, refPair } from './recommend.js';
 import { registerMemoryRoutes } from './memories.js';
-import { registerIdeaRoutes, ideasOpen, prefsFor } from './ideas.js';
+import { registerIdeaRoutes, ideasOpen, prefsFor, upcomingPlans } from './ideas.js';
 import { aiEnabled } from './ai.js';
 import { surveyDue, trackAppOpen } from './pmf.js';
 import { campaignForSignup } from './campaigns.js';
@@ -90,6 +90,7 @@ function meResponse(user: UserRow): MeResponse {
     prefs: prefsFor(user),
     ai: aiEnabled(),
     ideasOpen: ideasOpen(pair.id),
+    upcoming: upcomingPlans(pair.id),
     surveyDue: surveyDue(user),
   };
 }

@@ -325,7 +325,7 @@ function Overview() {
         <div className="grid grid-cols-2 gap-2">
           <Action to="/week" icon={Icon.week} title="Итог недели" hint="Карточка для сторис" />
           <Action to="/capsule" icon={Icon.capsule} title="Капсула времени" hint="Письма в будущее" />
-          <Action to="/ideas" icon={Icon.ideas} title="Хотим вместе" hint={me.ideasOpen ? `Идей в списке: ${me.ideasOpen}` : 'Идеи на выходные'} />
+          <Action to="/together" icon={Icon.ideas} title="Хотим вместе" hint={me.ideasOpen ? `Идей в списке: ${me.ideasOpen}` : 'Идеи на выходные'} />
           <Action to="/challenge" icon={Icon.duel} title="Вызвать пару" hint="5 вопросов друзьям" />
           {c.level >= LEVEL_BOOK ? (
             <Action to="/book" icon={Icon.levels} title="Книга пары" hint="Вся история одной книгой" />

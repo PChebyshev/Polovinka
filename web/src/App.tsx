@@ -8,8 +8,7 @@ import { Friend } from './screens/Friend';
 import { Recommend } from './screens/Recommend';
 import { Book } from './screens/Book';
 import { Privacy } from './screens/Privacy';
-import { Ideas } from './screens/Ideas';
-import { Gesture } from './screens/Gesture';
+import { Together } from './screens/Together';
 import { Settings } from './screens/Settings';
 import { History } from './screens/History';
 import { Week } from './screens/Week';
@@ -25,7 +24,7 @@ import { isStandalone, syncManifest } from './lib/install';
 import { getToken, trackScreen } from './lib/api';
 import { captureAttribution } from './lib/attr';
 import { CelebrationOverlay } from './components/Celebration';
-import { Spinner, Heart } from './components/ui';
+import { Spinner } from './components/ui';
 import { GestureCard } from './components/GestureToast';
 import { api } from './lib/api';
 
@@ -54,7 +53,15 @@ function Nav() {
             <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
           </svg>,
         )}
-        {item('/gesture', 'Жест', <Heart className="h-6 w-6" filled={false} />)}
+        {item(
+          '/together',
+          'Вместе',
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4.5" width="18" height="16.5" rx="3" />
+            <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+            <path d="M12 18.2l-2.6-2.5a1.6 1.6 0 0 1 2.6-1.9 1.6 1.6 0 0 1 2.6 1.9Z" fill="currentColor" stroke="none" />
+          </svg>,
+        )}
         {item(
           '/history',
           'История',
@@ -165,7 +172,7 @@ function Shell() {
     const tab = new URLSearchParams(loc.search).get('tab');
     const p = loc.pathname;
     const name = p === '/history' ? (tab === 'topics' ? 'topics' : 'history') : p === '/topics' ? 'topics' : p.slice(1);
-    if (['history', 'topics', 'ideas', 'book', 'levels', 'capsule', 'week', 'recommend', 'settings', 'gesture'].includes(name)) trackScreen(name);
+    if (['together', 'history', 'topics', 'book', 'levels', 'capsule', 'week', 'recommend', 'settings'].includes(name)) trackScreen(name);
   }, [loc.pathname, loc.search, me]);
 
   // Запуск с иконки: приложение могло стартовать со ссылки-приглашения, после входа — на главную.
@@ -192,7 +199,8 @@ function Shell() {
     <>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/gesture" element={<Gesture />} />
+        <Route path="/together" element={<Together />} />
+        <Route path="/gesture" element={<Navigate to="/together" replace />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/history" element={<History />} />
         <Route path="/week" element={<Week />} />
@@ -209,7 +217,7 @@ function Shell() {
         <Route path="/a/:code" element={<Navigate to="/" replace />} />
         <Route path="/recommend" element={<Recommend />} />
         <Route path="/book" element={<Book />} />
-        <Route path="/ideas" element={<Ideas />} />
+        <Route path="/ideas" element={<Navigate to="/together" replace />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="*" element={<Home />} />
       </Routes>

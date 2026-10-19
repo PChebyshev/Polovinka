@@ -133,6 +133,9 @@ function migrate() {
   if (!has('questions', 'source')) db.exec('ALTER TABLE questions ADD COLUMN source TEXT');
   // Пара пришла по рекламной кампании
   if (!has('pairs', 'campaign_id')) db.exec('ALTER TABLE pairs ADD COLUMN campaign_id TEXT');
+  // «Хотим вместе» → план на дату
+  if (!has('ideas', 'planned_for')) db.exec('ALTER TABLE ideas ADD COLUMN planned_for TEXT');
+  if (!has('ideas', 'planned_time')) db.exec('ALTER TABLE ideas ADD COLUMN planned_time TEXT');
   // Разовые исправления данных
   db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)');
   const once = (key: string, sql: string) => {

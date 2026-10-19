@@ -69,6 +69,10 @@ export interface Idea {
   createdBy: string;
   createdAt: string;
   doneAt: string | null;
+  /** Запланировано на дату YYYY-MM-DD (в часовом поясе пары). */
+  plannedFor: string | null;
+  /** Время HH:MM, необязательно. */
+  plannedTime: string | null;
 }
 
 /** Подсказка заботы: что радует половинку, по её ответам. */
@@ -314,6 +318,8 @@ export interface MeResponse {
   ai: boolean;
   /** Сколько идей в списке «Хотим вместе» ещё не сделано. */
   ideasOpen: number;
+  /** Ближайшие планы пары: сегодня и в ближайшие 7 дней. */
+  upcoming: Idea[];
   /** Пора показать короткий опрос о Половинке. */
   surveyDue: boolean;
 }

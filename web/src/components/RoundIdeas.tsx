@@ -40,8 +40,8 @@ export function RoundIdeas({ roundId }: { roundId: string }) {
     <Card className="rise-2">
       <div className="flex items-center justify-between">
         <Label>{data.source === 'ai' ? 'Идеи для вас ✦' : 'Идеи для вас'}</Label>
-        <Link to="/ideas" className="text-xs text-muted">
-          Хотим вместе →
+        <Link to="/together" className="text-xs text-muted">
+          Вместе →
         </Link>
       </div>
       <div className="mt-3 space-y-3">
@@ -56,7 +56,7 @@ export function RoundIdeas({ roundId }: { roundId: string }) {
               <div className="text-sm leading-snug">{idea.text}</div>
               {idea.kind === 'do' &&
                 (data.saved[i] ? (
-                  <span className="mt-1 inline-block text-xs text-sage">✓ В списке «Хотим вместе»</span>
+                  <span className="mt-1 inline-block text-xs text-sage">✓ Во вкладке «Вместе» — можно запланировать</span>
                 ) : (
                   <button className="mt-1 text-xs text-accent" onClick={() => save(i)} disabled={busy === i}>
                     + Хотим попробовать

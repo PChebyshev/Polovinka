@@ -2,6 +2,7 @@ import webpush from 'web-push';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { all, one, run, type PairRow, type UserRow } from './db.js';
+import { planToday } from './ideas.js';
 import { ensureDaily } from './selection.js';
 import { streakFor } from './progress.js';
 import { dateInTz } from './time.js';
@@ -216,8 +217,9 @@ export async function tickSchedule() {
       const answered = daily ? one('SELECT 1 FROM answers WHERE round_id = ? AND user_id = ?', daily.id, u.id) : null;
       if (daily && !answered && !isOnline(u.id)) {
         const q = one<{ text: string }>('SELECT text FROM questions WHERE id = ?', daily.question_id);
+        const plan = planToday(pair.id, dateInTz(pair.tz));
         await sendPush(u, 'morning', {
-          title: 'Вопрос дня ждёт',
+          title: plan ? `Сегодня у вас: ${plan.length > 60 ? plan.slice(0, 57) + '…' : plan}` : 'Вопрос дня ждёт',
           body: q ? `«${stripColon(q.text.replaceAll('{me}', u.name).replaceAll('{partner}', partner?.name ?? 'половинка'))}» — это 20 секунд.` : 'Два тапа, и вы на шаг ближе.',
           url: '/',
           tag: 'morning',

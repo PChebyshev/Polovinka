@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { RoundPublic } from '@polovinka/shared';
+import type { Idea, RoundPublic } from '@polovinka/shared';
 import { api, ApiError, clientId, QueuedError } from '../lib/api';
 import { InstallCard } from '../components/InstallCard';
 import { NotificationPrompt } from '../components/NotificationPrompt';
@@ -11,7 +11,7 @@ import { CareHintCard } from '../components/CareHintCard';
 import { PersonalQuestion } from '../components/PersonalQuestion';
 import { SurveyCard } from '../components/SurveyCard';
 import { useStore } from '../lib/store';
-import { formatDate, matchPercent, nDays, nDiscoveries } from '../lib/format';
+import { formatDate, matchPercent, nDays, nDiscoveries, relDay, todayLocal } from '../lib/format';
 import { Button, Card, Label, Spinner } from '../components/ui';
 import { QuestionCard } from '../components/QuestionCard';
 import { WaitingCard } from '../components/WaitingCard';
@@ -240,13 +240,18 @@ export function Home() {
 
         {today?.daily?.status === 'revealed' && partner && <PersonalQuestion />}
 
-        {partner && me.ideasOpen > 0 && (
-          <Link to="/ideas" className="block rounded-2xl border border-line bg-surface px-4 py-3">
-            <div className="text-xs uppercase tracking-wider text-muted">Хотим вместе</div>
-            <div className="mt-1 text-sm">
-              {me.ideasOpen} {me.ideasOpen % 10 === 1 && me.ideasOpen % 100 !== 11 ? 'идея ждёт' : 'идеи ждут'} вас →
-            </div>
-          </Link>
+        {partner && me.upcoming.length > 0 ? (
+          <UpcomingCard plan={me.upcoming[0]} more={me.upcoming.length - 1} partnerName={partner.name} myId={me.user.id} />
+        ) : (
+          partner &&
+          me.ideasOpen > 0 && (
+            <Link to="/together" className="block rounded-2xl border border-line bg-surface px-4 py-3">
+              <div className="text-xs uppercase tracking-wider text-muted">Хотим вместе</div>
+              <div className="mt-1 text-sm">
+                {me.ideasOpen} {me.ideasOpen % 10 === 1 && me.ideasOpen % 100 !== 11 ? 'идея ждёт' : 'идеи ждут'} — выберите день для одной →
+              </div>
+            </Link>
+          )
         )}
 
         {today?.daily && today.daily.mine && today.daily.status !== 'revealed' && today.bonusLeft > 0 && partner && (
@@ -256,6 +261,25 @@ export function Home() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Ближайший план пары: сегодня — ярко, скоро — спокойно. */
+function UpcomingCard({ plan, more, partnerName, myId }: { plan: Idea; more: number; partnerName: string; myId: string }) {
+  const today = todayLocal();
+  const isToday = plan.plannedFor === today;
+  return (
+    <Link to="/together" className={`block rounded-2xl border px-4 py-3 ${isToday ? 'border-accent/50 bg-accent/10' : 'border-lilac/40 bg-lilac/10'}`}>
+      <div className={`text-xs uppercase tracking-wider ${isToday ? 'text-accent' : 'text-lilac'}`}>
+        {isToday ? 'Сегодня у вас' : `Скоро · ${relDay(plan.plannedFor!, today)}`}
+        {plan.plannedTime ? ` · ${plan.plannedTime}` : ''}
+      </div>
+      <div className="mt-1 text-sm">{plan.text}</div>
+      <div className="mt-1 text-[11px] text-muted">
+        {plan.createdBy === myId ? 'вы добавили' : `добавил(а) ${partnerName}`}
+        {more > 0 ? ` · и ещё ${more} на неделе` : ''} →
+      </div>
+    </Link>
   );
 }
 

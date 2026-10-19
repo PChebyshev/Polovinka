@@ -39,6 +39,8 @@ interface IdeaRow {
   created_by: string;
   created_at: string;
   done_at: string | null;
+  planned_for: string | null;
+  planned_time: string | null;
 }
 
 function ideaPublic(r: IdeaRow): Idea {
@@ -51,7 +53,43 @@ function ideaPublic(r: IdeaRow): Idea {
     createdBy: r.created_by,
     createdAt: r.created_at,
     doneAt: r.done_at,
+    plannedFor: r.planned_for,
+    plannedTime: r.planned_time,
   };
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Настоящая дата в формате ГГГГ-ММ-ДД (не «2026-13-45»). */
+const isDate = (v: unknown): v is string => {
+  if (typeof v !== 'string' || !DATE_RE.test(v)) return false;
+  const t = Date.parse(`${v}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().startsWith(v);
+};
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Ближайшие планы пары: от сегодня до +7 дней, не сделанные. */
+export function upcomingPlans(pairId: string): Idea[] {
+  const pair = one<PairRow>('SELECT * FROM pairs WHERE id = ?', pairId);
+  if (!pair) return [];
+  const today = dateInTz(pair.tz);
+  return all<IdeaRow>(
+    `SELECT * FROM ideas WHERE pair_id = ? AND done_at IS NULL AND removed_at IS NULL AND planned_for BETWEEN ? AND ?
+      ORDER BY planned_for, COALESCE(planned_time, '99:99')`,
+    pairId,
+    today,
+    addDays(today, 7),
+  ).map(ideaPublic);
+}
+
+/** План на сегодня — для утреннего уведомления. */
+export function planToday(pairId: string, today: string): string | null {
+  return (
+    one<{ text: string }>(
+      `SELECT text FROM ideas WHERE pair_id = ? AND planned_for = ? AND done_at IS NULL AND removed_at IS NULL ORDER BY COALESCE(planned_time, '99:99') LIMIT 1`,
+      pairId,
+      today,
+    )?.text ?? null
+  );
 }
 
 export function ideasOpen(pairId: string): number {
@@ -373,7 +411,7 @@ export async function registerIdeaRoutes(app: FastifyInstance, deps: { meRespons
 
   app.post('/api/ideas', { preHandler: requireUser }, async (req, reply) => {
     const user = req.user!;
-    const body = (req.body ?? {}) as { text?: unknown; kind?: unknown; roundId?: unknown };
+    const body = (req.body ?? {}) as { text?: unknown; kind?: unknown; roundId?: unknown; date?: unknown; time?: unknown };
     const text = typeof body.text === 'string' ? body.text.replace(/\s+/g, ' ').trim().slice(0, IDEA_MAX) : '';
     if (text.length < 3) return reply.code(400).send({ error: 'text' });
     const roundId =
@@ -389,7 +427,7 @@ export async function registerIdeaRoutes(app: FastifyInstance, deps: { meRespons
         : 'round'
       : 'manual';
     run(
-      'INSERT INTO ideas (id, pair_id, text, kind, source, round_id, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO ideas (id, pair_id, text, kind, source, round_id, created_by, created_at, planned_for, planned_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       id,
       user.pair_id,
       text,
@@ -398,6 +436,8 @@ export async function registerIdeaRoutes(app: FastifyInstance, deps: { meRespons
       roundId,
       user.id,
       nowIso(),
+      isDate(body.date) ? body.date : null,
+      typeof body.time === 'string' && TIME_RE.test(body.time) ? body.time : null,
     );
     logEvent('idea_saved', { pairId: user.pair_id, userId: user.id, meta: { source } });
     sendTo(partnerOf(user)?.id, { type: 'pair_updated' });
@@ -412,6 +452,20 @@ export async function registerIdeaRoutes(app: FastifyInstance, deps: { meRespons
     const done = body.done !== false;
     run('UPDATE ideas SET done_at = ?, done_by = ? WHERE id = ?', done ? nowIso() : null, done ? user.id : null, idea.id);
     if (done) logEvent('idea_done', { pairId: user.pair_id, userId: user.id });
+    sendTo(partnerOf(user)?.id, { type: 'pair_updated' });
+    return ideaPublic(one<IdeaRow>('SELECT * FROM ideas WHERE id = ?', idea.id)!);
+  });
+
+  /** Запланировать на дату (и время) или снять дату: date = null. */
+  app.post('/api/ideas/:id/plan', { preHandler: requireUser }, async (req, reply) => {
+    const user = req.user!;
+    const body = (req.body ?? {}) as { date?: unknown; time?: unknown };
+    const idea = one<IdeaRow>('SELECT * FROM ideas WHERE id = ? AND pair_id = ? AND removed_at IS NULL', (req.params as { id: string }).id, user.pair_id);
+    if (!idea) return reply.code(404).send({ error: 'not_found' });
+    if (body.date !== null && !isDate(body.date)) return reply.code(400).send({ error: 'date' });
+    const time = body.date && typeof body.time === 'string' && TIME_RE.test(body.time) ? body.time : null;
+    run('UPDATE ideas SET planned_for = ?, planned_time = ? WHERE id = ?', (body.date as string | null) ?? null, time, idea.id);
+    if (body.date) logEvent('idea_planned', { pairId: user.pair_id, userId: user.id });
     sendTo(partnerOf(user)?.id, { type: 'pair_updated' });
     return ideaPublic(one<IdeaRow>('SELECT * FROM ideas WHERE id = ?', idea.id)!);
   });

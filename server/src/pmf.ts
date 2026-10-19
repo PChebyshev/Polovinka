@@ -54,6 +54,7 @@ const FEATURES: Feature[] = [
   { key: 'gesture', label: 'Тёплые жесты', events: ['gesture_sent'] },
   { key: 'ideas', label: 'Идеи → «Хотим вместе»', events: ['idea_saved'] },
   { key: 'ideas_done', label: 'Идеи: «Сделали»', events: ['idea_done'] },
+  { key: 'plan', label: 'Запланировали на дату', events: ['idea_planned'] },
   { key: 'personal', label: 'Вопрос по ответам (ИИ)', events: ['personal_question'] },
   { key: 'care', label: 'Подсказка заботы', events: ['care_hint'] },
   { key: 'repeat', label: '«Повтор»', events: ['repeat_started'] },
@@ -66,13 +67,13 @@ const FEATURES: Feature[] = [
   { key: 'recommend', label: 'Совет друзьям', events: ['ref_shared'] },
   { key: 'v_history', label: 'Экран «История»', events: ['screen:history'] },
   { key: 'v_topics', label: 'Экран «Темы»', events: ['screen:topics'] },
-  { key: 'v_ideas', label: 'Экран «Хотим вместе»', events: ['screen:ideas'] },
+  { key: 'v_together', label: 'Вкладка «Вместе»', events: ['screen:together', 'screen:ideas', 'screen:gesture'] },
   { key: 'v_book', label: 'Экран «Книга пары»', events: ['screen:book'] },
   { key: 'v_levels', label: 'Экран «Уровни»', events: ['screen:levels'] },
 ];
 
 /** Экраны, которые клиент может отметить событием screen. */
-export const TRACKED_SCREENS = ['history', 'topics', 'ideas', 'book', 'levels', 'capsule', 'week', 'recommend', 'settings', 'gesture'];
+export const TRACKED_SCREENS = ['together', 'history', 'topics', 'ideas', 'book', 'levels', 'capsule', 'week', 'recommend', 'settings', 'gesture'];
 
 /** Пары, которые пользовались функцией в интервале. */
 function featurePairs(f: Feature, from: string, to: string): { pairs: Set<string>; events: number } {
