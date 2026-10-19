@@ -122,8 +122,17 @@ if [ -n "$ip" ] && [ "$resolved" != "$ip" ]; then
 fi
 
 # --- 6. Сборка и запуск -------------------------------------------------------------
+# Каждая сборка оставляет старый образ и кеш на сотни мегабайт — за десятки обновлений диск заполняется
+free_mb=$(df -Pm / | awk 'NR==2 {print $4}')
+if [ "${free_mb:-0}" -lt 3000 ]; then
+  say "Свободно на диске ${free_mb} МБ — чищу кеш сборки Docker"
+  docker builder prune -af >/dev/null 2>&1 || true
+  docker image prune -af >/dev/null 2>&1 || true
+fi
 say "Собираю и запускаю (первый раз 3–8 минут)"
 docker compose up -d --build
+docker image prune -f >/dev/null 2>&1 || true
+docker builder prune -f >/dev/null 2>&1 || true
 
 say "Жду, пока приложение ответит"
 for _ in $(seq 1 60); do
