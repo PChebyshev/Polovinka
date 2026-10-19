@@ -59,7 +59,9 @@ function Daily({ rows, field, label }: { rows: StatsResponse['daily']; field: 'a
     <div>
       <div className="flex items-center justify-between text-xs">
         <span>{label}</span>
-        <span className="tabular-nums text-muted">{hover !== null ? `${rows[hover].date.slice(5)}: ${rows[hover][field]}` : `за период ${rows.reduce((s, r) => s + r[field], 0)}`}</span>
+        <span className="tabular-nums text-muted">
+          {hover !== null ? `${rows[hover].date.slice(5)}: ${rows[hover][field]}` : `за период ${rows.reduce((s, r) => s + r[field], 0)}`}
+        </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 h-16 w-full" preserveAspectRatio="none" onMouseLeave={() => setHover(null)}>
         <line x1="0" y1={H - 0.5} x2={W} y2={H - 0.5} stroke="currentColor" className="text-line" strokeWidth="0.5" />
@@ -68,7 +70,14 @@ function Daily({ rows, field, label }: { rows: StatsResponse['daily']; field: 'a
           return (
             <g key={r.date} onMouseEnter={() => setHover(i)}>
               <rect x={i * bw} y={0} width={bw} height={H} fill="transparent" />
-              <rect x={i * bw + bw * 0.2} y={H - 1 - h} width={bw * 0.6} height={h} rx={Math.min(1, bw * 0.3)} className={hover === i ? 'fill-sand' : 'fill-accent'} />
+              <rect
+                x={i * bw + bw * 0.2}
+                y={H - 1 - h}
+                width={bw * 0.6}
+                height={h}
+                rx={Math.min(1, bw * 0.3)}
+                className={hover === i ? 'fill-sand' : 'fill-accent'}
+              />
               {(i === maxIdx || i === rows.length - 1) && r[field] > 0 && (
                 <text x={i * bw + bw / 2} y={Math.max(4, H - 3 - h)} fontSize="3.5" textAnchor="middle" className="fill-muted">
                   {r[field]}
@@ -78,6 +87,28 @@ function Daily({ rows, field, label }: { rows: StatsResponse['daily']; field: 'a
           );
         })}
       </svg>
+    </div>
+  );
+}
+
+/** Строка о резервной копии: когда была последняя и всё ли в порядке. */
+function BackupLine({ b }: { b: StatsResponse['backup'] }) {
+  const hours = b.lastAt ? (Date.now() - Date.parse(b.lastAt)) / 3_600_000 : null;
+  const when = b.lastAt ? new Date(b.lastAt).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : null;
+  const fresh = hours !== null && hours < 36 && !b.error;
+  const text = !b.enabled
+    ? 'Резервные копии не настроены — база только на сервере'
+    : b.error
+      ? `Копия не отправилась: ${b.error}`
+      : when
+        ? `Резервная копия: ${when}${b.lastSize ? ` · ${Math.max(1, Math.round(b.lastSize / 1024))} КБ` : ''}`
+        : 'Резервные копии включены, первая будет в течение суток';
+  return (
+    <div
+      className={`mt-3 rounded-xl px-3 py-2 text-xs ${fresh ? 'bg-sage/10 text-sage' : !b.enabled || b.error || (hours !== null && hours >= 36) ? 'bg-rose/10 text-rose' : 'bg-surface-2 text-muted'}`}
+    >
+      {fresh ? '✓ ' : '⚠ '}
+      {text}
     </div>
   );
 }
@@ -112,7 +143,14 @@ export function Stats() {
         <h1 className="text-2xl font-bold">Статистика</h1>
         <p className="mt-1 text-sm text-muted">Нужен ключ STATS_KEY из настроек сервера.</p>
         <div className="mt-4 flex gap-2">
-          <input className="min-w-0 flex-1 rounded-2xl border border-line bg-surface-2 px-4 py-3 outline-none focus:border-accent/60" type="password" placeholder="Ключ" value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load()} />
+          <input
+            className="min-w-0 flex-1 rounded-2xl border border-line bg-surface-2 px-4 py-3 outline-none focus:border-accent/60"
+            type="password"
+            placeholder="Ключ"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void load()}
+          />
           <Button onClick={load}>Открыть</Button>
         </div>
         {err && <p className="mt-2 text-sm text-rose">{err}</p>}
@@ -131,7 +169,11 @@ export function Stats() {
         <h1 className="text-2xl font-bold">Статистика</h1>
         <div className="flex gap-1">
           {[7, 30, 90].map((d) => (
-            <button key={d} className={`rounded-full px-3 py-1 text-xs ${days === d ? 'bg-accent text-bg' : 'bg-surface-2 text-muted'}`} onClick={() => setDays(d)}>
+            <button
+              key={d}
+              className={`rounded-full px-3 py-1 text-xs ${days === d ? 'bg-accent text-bg' : 'bg-surface-2 text-muted'}`}
+              onClick={() => setDays(d)}
+            >
               {d} дн.
             </button>
           ))}
@@ -151,6 +193,8 @@ export function Stats() {
           </a>
         ))}
       </nav>
+
+      <BackupLine b={data.backup} />
 
       <PmfStats pmf={data.pmf} statsKey={key} periodDays={data.periodDays} onChanged={load} />
 
@@ -248,7 +292,11 @@ export function Stats() {
       <Card className="mt-3">
         <Label>Уведомления</Label>
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <Tile n={String(data.push.subscriptions.reduce((s, x) => s + x.n, 0))} label="подписок" hint={data.push.subscriptions.map((x) => `${x.service}: ${x.n}`).join(', ') || 'нет'} />
+          <Tile
+            n={String(data.push.subscriptions.reduce((s, x) => s + x.n, 0))}
+            label="подписок"
+            hint={data.push.subscriptions.map((x) => `${x.service}: ${x.n}`).join(', ') || 'нет'}
+          />
           <Tile n={String(data.push.sent)} label="доставлено сервису" />
           <Tile n={String(data.push.failed)} label="отказов" />
         </div>
@@ -277,7 +325,9 @@ export function Stats() {
             </tbody>
           </table>
         )}
-        <p className="mt-3 text-xs text-muted">«Доставлено сервису» значит, что Apple или Google приняли уведомление. Показ на телефоне дальше зависит от настроек телефона.</p>
+        <p className="mt-3 text-xs text-muted">
+          «Доставлено сервису» значит, что Apple или Google приняли уведомление. Показ на телефоне дальше зависит от настроек телефона.
+        </p>
       </Card>
 
       <Card className="mt-3 space-y-4">
@@ -315,7 +365,9 @@ export function Stats() {
         )}
       </Card>
 
-      <p className="mt-4 text-xs text-muted">Обновлено {new Date(data.generatedAt).toLocaleString('ru-RU')}. В событиях нет текстов ответов, только типы и даты.</p>
+      <p className="mt-4 text-xs text-muted">
+        Обновлено {new Date(data.generatedAt).toLocaleString('ru-RU')}. В событиях нет текстов ответов, только типы и даты.
+      </p>
     </div>
   );
 }

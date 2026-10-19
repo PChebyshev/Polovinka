@@ -15,6 +15,7 @@ function plural(n: number, one: string, few: string, many: string): string {
 import { registerRoutes } from './routes.js';
 import { initPush, startScheduler } from './push.js';
 import { initMail } from './mail.js';
+import { startBackups } from './backup.js';
 import { refPair, refPreview } from './recommend.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +35,7 @@ const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? 'info' }, trustP
 initPush(DATA_DIR, app.log);
 initMail(DATA_DIR, app.log);
 startScheduler();
+startBackups(DATA_DIR, app.log);
 await registerRoutes(app, { dataDir: DATA_DIR });
 
 /**

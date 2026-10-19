@@ -132,7 +132,64 @@ docker compose logs -f app     # ошибки приложения
 
 ## Бэкап
 
-Все данные (база, ключи push, картинки недели) — в томе Docker `app-data`:
+### Автоматически: копия базы в облачное хранилище
+
+Раз в сутки около 04:00 МСК приложение делает снимок базы, сжимает, шифрует паролем
+`BACKUP_PASSWORD` (AES-256) и отправляет в S3-совместимое хранилище — Yandex Object Storage
+или Timeweb S3. Без пароля копию не прочитать ни хранилищу, ни тому, кто получит ключи.
+Состояние видно вверху `/stats`: «✓ Резервная копия: …» или причина ошибки.
+
+Что настроить в Yandex Cloud (console.yandex.cloud):
+
+1. **Object Storage → Создать бакет.** Имя уникальное, например `polovinka-backup-7k3`;
+   доступ на чтение объектов и к списку — «Ограниченный»; класс — «Стандартное».
+2. **Сервисные аккаунты → Создать.** Имя `polovinka-backup`, роли `storage.uploader`
+   и `storage.viewer`.
+3. Откройте аккаунт → **Создать новый ключ → Создать статический ключ доступа.**
+   Скопируйте «Идентификатор ключа» и «Секретный ключ» — секрет показывают один раз.
+4. Необязательно: в бакете **Жизненный цикл → Добавить правило**, префикс `backups/`,
+   удалять через 90 дней.
+
+Добавьте в `/opt/polovinka/.env` и запустите `bash /opt/polovinka/deploy/install.sh`:
+
+```
+BACKUP_S3_BUCKET=polovinka-backup-7k3
+BACKUP_S3_KEY_ID=идентификатор-ключа
+BACKUP_S3_SECRET=секретный-ключ
+BACKUP_PASSWORD=длинная-фраза-которую-вы-придумали
+```
+
+Для Timeweb S3 добавьте ещё `BACKUP_S3_ENDPOINT=https://s3.timeweb.cloud` и `BACKUP_S3_REGION=ru-1`.
+
+**Сохраните `BACKUP_PASSWORD` и ключи вне сервера** (менеджер паролей, заметки):
+если сервер пропадёт, вместе с ним пропадёт и `.env`, а без пароля копии бесполезны.
+
+Проверить сразу, не дожидаясь ночи:
+
+```
+cd /opt/polovinka
+docker compose exec app node server/dist/server/src/backup.js now
+docker compose exec app node server/dist/server/src/backup.js list
+```
+
+### Восстановление из копии
+
+```
+cd /opt/polovinka
+docker compose exec app node server/dist/server/src/backup.js list
+docker compose exec app node server/dist/server/src/backup.js restore polovinka-ГГГГММДД-ЧЧММ.db.gz.enc /data/restored.db
+docker compose stop app
+docker run --rm -v polovinka_app-data:/data alpine sh -c \
+  'cd /data && mkdir -p before-restore && cp polovinka.db* before-restore/ && mv restored.db polovinka.db && rm -f polovinka.db-wal polovinka.db-shm'
+docker compose start app
+```
+
+Текущая база перед заменой сохраняется в `before-restore/`. На новом сервере: сначала
+`install.sh` с тем же `.env` (те же `BACKUP_*`), потом эти команды.
+
+### Вручную: архив всего тома
+
+База, ключи push и картинки недели лежат в томе Docker `app-data`:
 
 ```
 docker run --rm -v polovinka_app-data:/data -v /root:/backup alpine \
@@ -141,9 +198,6 @@ docker run --rm -v polovinka_app-data:/data -v /root:/backup alpine \
 
 Архив появится в `/root`. Скачать на компьютер:
 `scp root@IP:/root/polovinka-*.tgz .`
-
-Также можно включить автоматические бэкапы всего сервера в панели Timeweb
-на странице сервера.
 
 ## Переменные в `/opt/polovinka/.env`
 
@@ -154,6 +208,7 @@ docker run --rm -v polovinka_app-data:/data -v /root:/backup alpine \
 | `VAPID_EMAIL` | контакт для push-сервисов |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | необязательно; задайте при переезде на другой сервер, чтобы не потерять push-подписки |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | включают привязку почты и вход по коду из письма |
+| `BACKUP_S3_BUCKET`, `BACKUP_S3_KEY_ID`, `BACKUP_S3_SECRET`, `BACKUP_PASSWORD` | ежедневная зашифрованная копия базы в хранилище; `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION` — если не Яндекс |
 | `EMAIL_REQUIRED` | `1` (по умолчанию) — просить почту после первого ответа; `0` — не просить |
 | `DATA_LOCATION`, `OPERATOR_NAME`, `PRIVACY_CONTACT` | необязательно; показываются на странице «Что мы храним», см. `docs/LEGAL.md` |
 | `CROWD_MIN` | с какого числа ответов показывать «Как ответили другие пары», по умолчанию 20 |

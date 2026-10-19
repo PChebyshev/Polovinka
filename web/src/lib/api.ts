@@ -316,6 +316,7 @@ export interface CampaignStats {
 
 export interface StatsResponse {
   pmf: PmfResponse;
+  backup: { enabled: boolean; lastAt: string | null; lastKey: string | null; lastSize: number | null; error: string | null; errorAt: string | null };
   ads: { campaigns: CampaignStats[]; organic: Omit<CampaignStats, 'id' | 'code' | 'url' | 'budget' | 'auto' | 'archived' | 'createdAt' | 'source' | 'name'> };
   generatedAt: string;
   periodDays: number;

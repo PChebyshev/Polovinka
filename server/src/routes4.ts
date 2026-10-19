@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
 import { all, one, run, logEvent, type UserRow } from './db.js';
+import { backupStatus } from './backup.js';
 import { hashToken, newId, newToken, nowIso } from './ids.js';
 import { randomInt } from 'node:crypto';
 import { requireUser } from './auth.js';
@@ -170,7 +171,7 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
     const key = q.key ?? (req.headers['x-stats-key'] as string | undefined);
     if (!keyOk(key)) return reply.code(401).send({ error: 'stats_key' });
     const days = Math.min(365, Math.max(7, Number(q.days ?? 30) || 30));
-    return { ...computeStats(days), pmf: computePmf(days), ads: computeCampaigns(campaignBase(req), days) };
+    return { ...computeStats(days), pmf: computePmf(days), ads: computeCampaigns(campaignBase(req), days), backup: backupStatus() };
   });
 
   await registerPmfRoutes(app, { keyOk, meResponse: deps.meResponse });
