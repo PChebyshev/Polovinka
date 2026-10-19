@@ -328,6 +328,10 @@ export interface AccessState {
   email: string | null;
   /** На сервере настроена отправка писем. */
   emailEnabled: boolean;
+  /** Почта обязательна: без неё аккаунт легко потерять. */
+  emailRequired: boolean;
+  /** Пора показать экран привязки почты. */
+  emailDue: boolean;
   hasRecovery: boolean;
   recoveryCreatedAt: string | null;
 }

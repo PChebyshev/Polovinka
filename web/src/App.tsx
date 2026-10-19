@@ -24,6 +24,7 @@ import { isStandalone, syncManifest } from './lib/install';
 import { getToken, trackScreen } from './lib/api';
 import { captureAttribution } from './lib/attr';
 import { CelebrationOverlay } from './components/Celebration';
+import { EmailGate, emailGateDeferred } from './components/Access';
 import { Spinner } from './components/ui';
 import { GestureCard } from './components/GestureToast';
 import { api } from './lib/api';
@@ -153,6 +154,7 @@ function Shell() {
   const nav = useNavigate();
   const handoff = useHandoff();
   const launched = useRef(false);
+  const [gateDeferred, setGateDeferred] = useState(emailGateDeferred);
 
   useEffect(() => {
     syncManifest(loc.pathname, loc.search);
@@ -195,6 +197,8 @@ function Shell() {
   if (!me && handoff.failed) return <Onboarding handoffFailed />;
   const publicPath = ['/j/', '/f/', '/w/', '/c/', '/stats', '/privacy'].some((p) => loc.pathname.startsWith(p));
   if (!me && !publicPath) return <Onboarding />;
+  // Почта обязательна: после первого ответа просим привязать, чтобы аккаунт не потерялся
+  if (me?.access.emailDue && !gateDeferred && !publicPath) return <EmailGate onDeferred={() => setGateDeferred(true)} />;
   return (
     <>
       <Routes>

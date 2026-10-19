@@ -127,6 +127,7 @@ export interface PmfResponse {
   }>;
   cohorts: Array<{ weekStart: string; size: number; weeks: Array<number | null> }>;
   activation: Array<[string, number]>;
+  access: Array<[string, number]>;
   stages: Array<{ stage: string; pairs: number; activeShare: number | null; avgDays: number | null }>;
   survey: {
     responses: number;
@@ -409,7 +410,23 @@ export function computePmf(periodDays: number): PmfResponse {
     names: namesOf(r.pair_id),
   }));
 
-  return { excluded, week, weekly, features, cohorts, activation, stages, survey, pairs };
+  // --- Сохранность аккаунтов: есть ли способ вернуться при смене телефона ---
+  const acc = one<{ total: number; email: number; recovery: number; due: number }>(
+    `SELECT COUNT(*) AS total,
+            SUM(u.email IS NOT NULL) AS email,
+            SUM(u.email IS NULL AND u.recovery_hash IS NOT NULL) AS recovery,
+            SUM(u.email IS NULL AND EXISTS (SELECT 1 FROM answers a WHERE a.user_id = u.id)) AS due
+       FROM users u JOIN pairs p ON p.id = u.pair_id
+      WHERE p.is_guest = 0 AND p.deleted_at IS NULL AND ${notExcluded('u.pair_id')}`,
+  );
+  const access: Array<[string, number]> = [
+    ['Всего людей', Number(acc?.total ?? 0)],
+    ['Привязали почту', Number(acc?.email ?? 0)],
+    ['Только код восстановления', Number(acc?.recovery ?? 0)],
+    ['Без почты, уже отвечали (видят экран почты)', Number(acc?.due ?? 0)],
+  ];
+
+  return { excluded, week, weekly, features, cohorts, activation, stages, survey, pairs, access };
 }
 
 // --- Маршруты ---------------------------------------------------------------------------

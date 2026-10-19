@@ -148,6 +148,8 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
       'offline_flushed',
       'landing_browser',
       'standalone_launch',
+      'email_gate_shown',
+      'email_gate_deferred',
     ]);
     if (typeof body.type !== 'string' || !allowed.has(body.type)) return reply.code(400).send({ error: 'type' });
     logEvent(body.type, { pairId: user.pair_id, userId: user.id });

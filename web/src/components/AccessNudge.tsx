@@ -14,7 +14,7 @@ export function AccessNudge() {
       return false;
     }
   });
-  if (!me || hidden || me.access.hasRecovery || me.access.email || me.counters.discoveries < 3) return null;
+  if (!me || hidden || me.access.emailRequired || me.access.hasRecovery || me.access.email || me.counters.discoveries < 3) return null;
   const dismiss = () => {
     try {
       localStorage.setItem(KEY, String(Date.now()));

@@ -146,6 +146,7 @@ function migrate() {
   // Подсказки заботы до исправления промпта могли быть адресованы не тому — пересоздадутся
   once('care_hints_v2', "DELETE FROM care_hints WHERE seen_at IS NULL");
   db.exec('CREATE INDEX IF NOT EXISTS users_recovery ON users(recovery_hash) WHERE recovery_hash IS NOT NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS answers_user ON answers(user_id)');
 }
 
 function findQuestionsJson(): string {

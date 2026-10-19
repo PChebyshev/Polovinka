@@ -196,7 +196,9 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
         )}
       </div>
 
-      <Label className="mt-6 scroll-mt-4" id="week">Последние 7 дней</Label>
+      <Label className="mt-6 scroll-mt-4" id="week">
+        Последние 7 дней
+      </Label>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Tile n={`${w.activePairs} из ${w.completePairs}`} label="пар отвечали" />
         <Tile n={w.medianDaysActive === null ? '—' : String(w.medianDaysActive)} label="дней с ответами у пары" hint="медиана среди активных" />
@@ -247,7 +249,9 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
         </div>
       </Section>
 
-      <Label className="mt-6 scroll-mt-4" id="pmf">Product–market fit</Label>
+      <Label className="mt-6 scroll-mt-4" id="pmf">
+        Product–market fit
+      </Label>
 
       <Section title="Опрос: «Если бы Половинка исчезла…»" hint="Тест Шона Эллиса. Цель — 40% и больше отвечают «очень расстроюсь».">
         {s.responses === 0 ? (
@@ -296,6 +300,10 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
 
       <Section title={`Активация: пары, созданные за ${periodDays} дн.`}>
         <BarList rows={pmf.activation} wide />
+      </Section>
+
+      <Section title="Сохранность аккаунтов" hint="Без почты вход живёт только в одном телефоне: смена телефона или очистка браузера — и история потеряна.">
+        <BarList rows={pmf.access} wide />
       </Section>
 
       {pmf.stages.length > 0 && (

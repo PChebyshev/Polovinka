@@ -194,6 +194,7 @@ export const api = {
 
 export interface AppConfig {
   emailLogin: boolean;
+  emailRequired?: boolean;
   dataLocation: string | null;
   contact: string | null;
   operator: string | null;
@@ -265,6 +266,7 @@ export interface PmfResponse {
   features: Array<{ key: string; label: string; pairs: number; share: number | null; events: number; liftUsers: number; liftUsed: number | null; liftOthers: number | null }>;
   cohorts: Array<{ weekStart: string; size: number; weeks: Array<number | null> }>;
   activation: Array<[string, number]>;
+  access: Array<[string, number]>;
   stages: Array<{ stage: string; pairs: number; activeShare: number | null; avgDays: number | null }>;
   survey: {
     responses: number;

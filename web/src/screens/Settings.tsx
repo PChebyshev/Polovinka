@@ -193,8 +193,17 @@ export function Settings() {
           Аккаунт без пароля: вход хранится в этом телефоне. Чтобы не потерять историю при переустановке, оставьте себе способ вернуться.
         </p>
         <div className="mt-4 space-y-5">
-          <RecoveryBox />
-          <EmailBox />
+          {me.access.emailRequired ? (
+            <>
+              <EmailBox />
+              <RecoveryBox />
+            </>
+          ) : (
+            <>
+              <RecoveryBox />
+              <EmailBox />
+            </>
+          )}
           <RevokeBox />
         </div>
       </Card>

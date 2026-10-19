@@ -118,9 +118,17 @@ async function issueEmailCode(email: string, purpose: 'bind' | 'login', userId: 
 }
 
 /** Проверяет код: верный — помечает использованным, неверный — считает попытки. */
-function checkEmailCode(email: string, purpose: 'bind' | 'login', raw: unknown): { ok: true; row: EmailCodeRow } | { ok: false; reason: 'code_invalid' | 'code_expired' | 'too_many_attempts' } {
+function checkEmailCode(
+  email: string,
+  purpose: 'bind' | 'login',
+  raw: unknown,
+): { ok: true; row: EmailCodeRow } | { ok: false; reason: 'code_invalid' | 'code_expired' | 'too_many_attempts' } {
   const code = typeof raw === 'string' ? raw.replace(/\D/g, '') : '';
-  const row = one<EmailCodeRow>('SELECT * FROM email_codes WHERE email = ? AND purpose = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1', email, purpose);
+  const row = one<EmailCodeRow>(
+    'SELECT * FROM email_codes WHERE email = ? AND purpose = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1',
+    email,
+    purpose,
+  );
   if (!row) return { ok: false, reason: 'code_expired' };
   if (row.expires_at < nowIso()) return { ok: false, reason: 'code_expired' };
   if (row.attempts >= EMAIL_CODE_MAX_ATTEMPTS) return { ok: false, reason: 'too_many_attempts' };
@@ -155,11 +163,24 @@ function issueToken(user: UserRow): string {
   return token;
 }
 
+/** Почта обязательна, если письма настроены (выключить: EMAIL_REQUIRED=0). */
+export function emailRequired(): boolean {
+  return mailEnabled() && process.env.EMAIL_REQUIRED?.trim() !== '0';
+}
+
+/** Пора попросить почту: обязательна, ещё не привязана, пара не гостевая и человек уже ответил хотя бы раз. */
+function emailDue(user: UserRow): boolean {
+  if (!emailRequired() || user.email) return false;
+  if (one('SELECT 1 FROM pairs WHERE id = ? AND is_guest = 1', user.pair_id)) return false;
+  return !!one('SELECT 1 FROM answers WHERE user_id = ? LIMIT 1', user.id);
+}
 
 export function accessState(user: UserRow): AccessState {
   return {
     email: user.email ?? null,
     emailEnabled: mailEnabled(),
+    emailRequired: emailRequired(),
+    emailDue: emailDue(user),
     hasRecovery: !!user.recovery_hash,
     recoveryCreatedAt: user.recovery_created_at ?? null,
   };
@@ -169,6 +190,7 @@ export async function registerAccessRoutes(app: FastifyInstance, deps: { meRespo
   /** Публичные настройки для экрана входа. */
   app.get('/api/config', async () => ({
     emailLogin: mailEnabled(),
+    emailRequired: emailRequired(),
     // Для страницы «Что мы храним»: где стоит сервер и как связаться. Задаются в .env.
     dataLocation: process.env.DATA_LOCATION?.trim() || null,
     contact: process.env.PRIVACY_CONTACT?.trim() || null,
@@ -222,7 +244,13 @@ export async function registerAccessRoutes(app: FastifyInstance, deps: { meRespo
     if (limited('bind:' + user.id, 3, 10) || limited('mail:' + req.ip, 10, 10)) return tooMany(reply);
     const taken = one<{ id: string }>('SELECT id FROM users WHERE email = ? AND id <> ?', email, user.id);
     if (taken) return reply.code(409).send({ error: 'email_taken' });
-    await issueEmailCode(email, 'bind', user.id, user.name);
+    try {
+      await issueEmailCode(email, 'bind', user.id, user.name);
+    } catch (e) {
+      req.log.warn(`почта: письмо на ${maskEmail(email)} не ушло: ${e instanceof Error ? e.message : String(e)}`);
+      return reply.code(502).send({ error: 'mail_failed' });
+    }
+    logEvent('email_code_sent', { pairId: user.pair_id, userId: user.id });
     return { ok: true, email, masked: maskEmail(email) };
   });
 
@@ -241,8 +269,10 @@ export async function registerAccessRoutes(app: FastifyInstance, deps: { meRespo
     return deps.meResponse(one<UserRow>('SELECT * FROM users WHERE id = ?', user.id)!);
   });
 
-  app.delete('/api/email', { preHandler: requireUser }, async (req) => {
+  app.delete('/api/email', { preHandler: requireUser }, async (req, reply) => {
     const user = req.user!;
+    // Когда почта обязательна, её можно сменить, но не убрать совсем
+    if (emailRequired()) return reply.code(409).send({ error: 'email_required' });
     run('UPDATE users SET email = NULL, email_verified_at = NULL WHERE id = ?', user.id);
     return deps.meResponse(one<UserRow>('SELECT * FROM users WHERE id = ?', user.id)!);
   });
