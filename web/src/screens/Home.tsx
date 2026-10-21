@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Idea, RoundPublic } from '@polovinka/shared';
 import { api, ApiError, clientId, QueuedError } from '../lib/api';
 import { InstallCard } from '../components/InstallCard';
+import { DesktopHandoffCard } from '../components/DesktopHandoff';
 import { NotificationPrompt } from '../components/NotificationPrompt';
 import { AccessNudge } from '../components/AccessNudge';
 import { RecommendNudge } from '../components/RecommendNudge';
@@ -148,6 +149,7 @@ export function Home() {
       <div className="space-y-4">
         {partner && <StageCard />}
         <InstallCard />
+        <DesktopHandoffCard />
         {partner && <NotificationPrompt />}
         {partner && <AccessNudge />}
         {partner && <RecommendNudge />}

@@ -225,7 +225,9 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     if (!pair) return reply.code(404).send({ error: 'invite_not_found' });
     const members = all<UserRow>('SELECT * FROM users WHERE pair_id = ?', pair.id);
     const viewer = userByToken(readToken(req));
-    if (!viewer || viewer.pair_id !== pair.id) logEvent('invite_opened', { pairId: pair.id, userId: viewer?.id ?? null });
+    // peek: экран QR на компьютере — открытие засчитаем, когда ссылку откроют на телефоне
+    const peek = (req.query as { peek?: string }).peek === '1';
+    if (!peek && (!viewer || viewer.pair_id !== pair.id)) logEvent('invite_opened', { pairId: pair.id, userId: viewer?.id ?? null });
     const inviter = members.find((m) => m.id !== viewer?.id) ?? members[0];
     return {
       inviterName: inviter?.name ?? null,

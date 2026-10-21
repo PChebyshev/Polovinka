@@ -24,6 +24,8 @@ export interface StatsResponse {
     weeklyOpened: number;
     landingInstallShown: number;
     landingBrowser: number;
+    desktopQrShown: number;
+    qrOpened: number;
     standaloneLaunch: number;
     handoffRedeemed: number;
   };
@@ -74,6 +76,8 @@ export function computeStats(periodDays = 30): StatsResponse {
     weeklyOpened: count('weekly_opened', since),
     landingInstallShown: count('landing_install_shown', since),
     landingBrowser: count('landing_browser', since),
+    desktopQrShown: count('desktop_qr_shown', since),
+    qrOpened: count('qr_open', since),
     standaloneLaunch: count('standalone_launch', since),
     handoffRedeemed: count('handoff_redeemed', since) + count('login_code_redeemed', since),
     refShared: count('ref_shared', since),

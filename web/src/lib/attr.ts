@@ -9,6 +9,26 @@ const KEY = 'polovinka.attr';
 const VKEY = 'polovinka.visitor';
 const DAYS = 30;
 
+/** Посетитель, пришедший по QR с компьютера, остаётся тем же человеком: переход не считается дважды. */
+export function adoptVisitor(search: string) {
+  const v = new URLSearchParams(search).get('v');
+  if (!v || !/^[a-z0-9]{8,32}$/.test(v)) return;
+  try {
+    if (!localStorage.getItem(VKEY)) localStorage.setItem(VKEY, v);
+  } catch {
+    /* приватный режим */
+  }
+}
+
+/** Уже известный id посетителя, без создания нового. */
+export function knownVisitor(): string | null {
+  try {
+    return localStorage.getItem(VKEY);
+  } catch {
+    return null;
+  }
+}
+
 function visitorId(): string {
   try {
     let v = localStorage.getItem(VKEY);

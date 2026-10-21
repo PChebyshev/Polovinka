@@ -87,7 +87,8 @@ export async function registerRecommendRoutes(app: FastifyInstance) {
     const r = refPair(code);
     if (!r) return reply.code(404).send({ error: 'not_found' });
     const viewer = userByToken(readToken(req));
-    if (!viewer || viewer.pair_id !== r.pair.id) logEvent('ref_opened', { pairId: r.pair.id, userId: viewer?.id ?? null });
+    const peek = (req.query as { peek?: string }).peek === '1';
+    if (!peek && (!viewer || viewer.pair_id !== r.pair.id)) logEvent('ref_opened', { pairId: r.pair.id, userId: viewer?.id ?? null });
     return { names: r.names, days: r.days };
   });
 }

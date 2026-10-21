@@ -90,12 +90,13 @@ export const api = {
     request<{ ok: true }>('PUT', `/api/campaigns/${id}?key=${encodeURIComponent(key)}`, body),
   recommend: () => request<{ code: string; url: string; host: string; image: string; title: string; description: string }>('GET', '/api/recommend'),
   recommendSent: (via: string, variant: string) => request<{ ok: true }>('POST', '/api/recommend/sent', { via, variant }),
-  recommendInfo: (code: string) => request<{ names: string[]; days: number }>('GET', `/api/recommend/${encodeURIComponent(code)}`),
+  recommendInfo: (code: string, peek = false) => request<{ names: string[]; days: number }>('GET', `/api/recommend/${encodeURIComponent(code)}${peek ? '?peek=1' : ''}`),
   me: () => request<MeResponse>('GET', '/api/me'),
   updateMe: (patch: { name?: string; notifMorning?: string; notifEvening?: string; notifEnabled?: boolean; tz?: string }) => request<MeResponse>('PUT', '/api/me', patch),
   invite: () => request<{ code: string; url: string; text: string }>('GET', '/api/invite'),
   inviteSent: (via: string) => request<{ ok: true }>('POST', '/api/invite/sent', { via }),
-  inviteInfo: (code: string) => request<{ inviterName: string | null; full: boolean; alreadyMember: boolean }>('GET', `/api/invite/${encodeURIComponent(code)}`),
+  inviteInfo: (code: string, peek = false) =>
+    request<{ inviterName: string | null; full: boolean; alreadyMember: boolean }>('GET', `/api/invite/${encodeURIComponent(code)}${peek ? '?peek=1' : ''}`),
   join: (code: string) => request<MeResponse>('POST', '/api/pair/join', { code }),
   today: () => request<TodayResponse>('GET', '/api/today'),
   round: (id: string) => request<RoundPublic>('GET', `/api/rounds/${id}`),
@@ -132,7 +133,7 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, 'upload');
   },
   createChallenge: () => request<{ code: string; url: string; text: string; compare: ChallengeCompare }>('POST', '/api/challenges'),
-  challengeInfo: (code: string) => request<ChallengeInfo>('GET', `/api/challenges/${encodeURIComponent(code)}`),
+  challengeInfo: (code: string, peek = false) => request<ChallengeInfo>('GET', `/api/challenges/${encodeURIComponent(code)}${peek ? '?peek=1' : ''}`),
   joinChallenge: (code: string) => request<ChallengeCompare>('POST', `/api/challenges/${encodeURIComponent(code)}/join`),
   challengeCompare: (code: string) => request<ChallengeCompare>('GET', `/api/challenges/${encodeURIComponent(code)}/compare`),
   convertPair: () => request<MeResponse>('POST', '/api/pair/convert'),
@@ -333,6 +334,8 @@ export interface StatsResponse {
     weeklyOpened: number;
     landingInstallShown: number;
     landingBrowser: number;
+    desktopQrShown: number;
+    qrOpened: number;
     standaloneLaunch: number;
     handoffRedeemed: number;
     refShared: number;

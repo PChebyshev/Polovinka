@@ -20,9 +20,10 @@ import { Install } from './screens/Install';
 import { Levels } from './screens/Levels';
 import { Topics } from './screens/Topics';
 import { Capsule } from './screens/Capsule';
-import { isStandalone, syncManifest } from './lib/install';
+import { isStandalone, platform, syncManifest } from './lib/install';
 import { getToken, trackScreen } from './lib/api';
-import { captureAttribution } from './lib/attr';
+import { adoptVisitor, captureAttribution } from './lib/attr';
+import { DesktopQr } from './screens/DesktopQr';
 import { CelebrationOverlay } from './components/Celebration';
 import { EmailGate, emailGateDeferred } from './components/Access';
 import { Spinner } from './components/ui';
@@ -148,11 +149,42 @@ function useHandoff(): { pending: boolean; failed: boolean } {
   return state;
 }
 
+/** Компьютер без входа: только QR на телефон. `?desktop=1` — служебный выключатель (тесты, владелец). */
+function desktopGate(): boolean {
+  if (platform() !== 'desktop' || isStandalone()) return false;
+  try {
+    if (new URLSearchParams(location.search).get('desktop') === '1') localStorage.setItem('polovinka.allowDesktop', '1');
+    return !localStorage.getItem('polovinka.allowDesktop');
+  } catch {
+    return true;
+  }
+}
+
+/** Открыли по QR с компьютера: отмечаем и убираем служебные метки из адреса. */
+function useQrArrival() {
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (q.get('src') !== 'qr') return;
+    adoptVisitor(location.search);
+    void fetch('/api/events/anon', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'qr_open' }),
+    }).catch(() => undefined);
+    q.delete('src');
+    q.delete('v');
+    const rest = q.toString();
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : ''));
+  }, []);
+}
+
 function Shell() {
   const { ready, me } = useStore();
   const loc = useLocation();
   const nav = useNavigate();
+  useQrArrival();
   const handoff = useHandoff();
+  const [gate] = useState(desktopGate);
   const launched = useRef(false);
   const [gateDeferred, setGateDeferred] = useState(emailGateDeferred);
 
@@ -196,6 +228,9 @@ function Shell() {
   if (!ready || handoff.pending) return <Spinner />;
   if (!me && handoff.failed) return <Onboarding handoffFailed />;
   const publicPath = ['/j/', '/f/', '/w/', '/c/', '/stats', '/privacy'].some((p) => loc.pathname.startsWith(p));
+  // На компьютере новый человек видит только QR; служебные и публичные страницы открываются как есть
+  const desktopFree = ['/stats', '/privacy', '/w/'].some((p) => loc.pathname.startsWith(p));
+  if (!me && gate && !desktopFree) return new URLSearchParams(loc.search).get('login') === '1' ? <Onboarding loginOnly /> : <DesktopQr />;
   if (!me && !publicPath) return <Onboarding />;
   // Почта обязательна: после первого ответа просим привязать, чтобы аккаунт не потерялся
   if (me?.access.emailDue && !gateDeferred && !publicPath) return <EmailGate onDeferred={() => setGateDeferred(true)} />;

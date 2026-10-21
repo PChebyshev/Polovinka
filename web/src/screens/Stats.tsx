@@ -275,6 +275,9 @@ export function Stats() {
         <p className="mt-3 text-xs text-muted">
           Продолжили в браузере: {f.landingBrowser}. Перенесли вход в приложение кодом: {f.handoffRedeemed}.
         </p>
+        <p className="mt-1 text-xs text-muted">
+          С компьютера: показали QR {f.desktopQrShown} раз, открыли по QR на телефоне — {f.qrOpened}.
+        </p>
       </Card>
 
       <Card className="mt-3">

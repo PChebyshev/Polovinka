@@ -316,7 +316,8 @@ export async function registerStage3Routes(app: FastifyInstance, deps: Deps) {
     if (!ch) return reply.code(404).send({ error: 'not_found' });
     const viewer = userByToken(readToken(req));
     const participant = !!viewer && isParticipant(ch, viewer.pair_id);
-    if (!participant) {
+    const peek = (req.query as { peek?: string }).peek === '1';
+    if (!participant && !peek) {
       run('UPDATE challenges SET opened_count = opened_count + 1 WHERE id = ?', ch.id);
       logEvent('challenge_opened', { pairId: viewer?.pair_id ?? null, userId: viewer?.id ?? null, meta: { code: ch.code } });
     }

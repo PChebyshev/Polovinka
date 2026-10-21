@@ -45,6 +45,7 @@ export function Onboarding({
   handoffFailed = false,
   refCode,
   context,
+  loginOnly = false,
 }: {
   joinCode?: string;
   challengeCode?: string;
@@ -56,9 +57,11 @@ export function Onboarding({
   refCode?: string;
   /** Блок под заголовком: например, «Как это устроено» для пришедших по совету. */
   context?: ReactNode;
+  /** Только вход в существующий аккаунт: на компьютере новый аккаунт не заводим. */
+  loginOnly?: boolean;
 }) {
   const { login } = useStore();
-  const [mode, setMode] = useState<Mode>(handoffFailed ? 'code' : shouldOfferInstall() ? 'install' : 'name');
+  const [mode, setMode] = useState<Mode>(loginOnly ? 'code' : handoffFailed ? 'code' : shouldOfferInstall() ? 'install' : 'name');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [phrase, setPhrase] = useState('');
@@ -292,8 +295,12 @@ export function Onboarding({
                 Войти по почте
               </button>
             )}
-            <button type="button" className="underline decoration-dotted" onClick={() => setMode('name')}>
-              Я здесь впервые
+            <button
+              type="button"
+              className="underline decoration-dotted"
+              onClick={() => (loginOnly ? window.location.assign(window.location.pathname) : setMode('name'))}
+            >
+              {loginOnly ? 'Назад' : 'Я здесь впервые'}
             </button>
           </div>
         </form>

@@ -150,6 +150,8 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
       'landing_browser',
       'standalone_launch',
       'email_gate_shown',
+      'qr_open',
+      'desktop_handoff_shown',
       'email_gate_deferred',
     ]);
     if (typeof body.type !== 'string' || !allowed.has(body.type)) return reply.code(400).send({ error: 'type' });
@@ -160,7 +162,7 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
   /** Анонимные события лендинга: пользователя ещё нет. */
   app.post('/api/events/anon', async (req, reply) => {
     const type = ((req.body ?? {}) as { type?: unknown }).type;
-    const allowed = new Set(['landing_install_shown', 'landing_browser']);
+    const allowed = new Set(['landing_install_shown', 'landing_browser', 'desktop_qr_shown', 'qr_open']);
     if (typeof type !== 'string' || !allowed.has(type)) return reply.code(400).send({ error: 'type' });
     logEvent(type, {});
     return { ok: true };
