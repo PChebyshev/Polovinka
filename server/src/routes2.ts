@@ -4,7 +4,7 @@ import { CATEGORY_LABELS, GESTURE_LABELS } from '../../shared/src/types.js';
 import { all, one, run, logEvent, type GestureRow, type PairRow, type QuestionRow, type RoundRow, type UserRow } from './db.js';
 import { newId, nowIso } from './ids.js';
 import { requireUser } from './auth.js';
-import { pickQuestion } from './selection.js';
+import { markQuestion, parseReasons, pickQuestion } from './selection.js';
 import { gesturePublic, partnerOf, roundPublic } from './serialize.js';
 import { sendTo } from './sse.js';
 import { markCelebrationSeen, levelFor } from './levels.js';
@@ -120,17 +120,17 @@ export async function registerStage2Routes(app: FastifyInstance, deps: Deps) {
     return { ok: true };
   });
 
-  // --- «Не про нас» -------------------------------------------------------------
+  // --- «Плохой вопрос» --------------------------------------------------------------
 
-  /** Помечает вопрос раунда «не про нас». Если никто ещё не ответил — подменяет вопрос. */
+  /** Помечает вопрос раунда плохим (с причинами). Если никто ещё не ответил — подменяет вопрос. */
   app.post('/api/rounds/:id/skip', { preHandler: requireUser }, async (req, reply) => {
     const user = req.user!;
     const partner = partnerOf(user);
     const pair = one<PairRow>('SELECT * FROM pairs WHERE id = ?', user.pair_id)!;
     const round = one<RoundRow>('SELECT * FROM rounds WHERE id = ? AND pair_id = ?', (req.params as { id: string }).id, user.pair_id);
     if (!round) return reply.code(404).send({ error: 'round_not_found' });
-    run('INSERT OR IGNORE INTO question_marks (pair_id, user_id, question_id, created_at) VALUES (?, ?, ?, ?)', user.pair_id, user.id, round.question_id, nowIso());
-    logEvent('question_marked', { pairId: user.pair_id, userId: user.id });
+    const body = (req.body ?? {}) as { reasons?: unknown; comment?: unknown };
+    markQuestion(user.pair_id, user.id, round.question_id, parseReasons(body.reasons), body.comment);
     const answered = one<{ n: number }>('SELECT COUNT(*) AS n FROM answers WHERE round_id = ?', round.id);
     if (Number(answered?.n ?? 0) > 0 || round.kind === 'challenge') {
       return { replaced: false, round: roundPublic(round, user, partner) };

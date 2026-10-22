@@ -2,7 +2,20 @@ import { all, one } from './db.js';
 import { addDays } from './time.js';
 import { notExcluded } from './pmf.js';
 
+export interface BadQuestionStat {
+  id: string;
+  text: string;
+  category: string;
+  marks: number;
+  /** Сколько разных пар отметили. */
+  pairs: number;
+  reasons: Record<string, number>;
+  comments: string[];
+}
+
 export interface StatsResponse {
+  /** «Плохие вопросы» за всё время: что отмечают и почему. */
+  badQuestions: { total: number; reasons: Record<string, number>; top: BadQuestionStat[] };
   generatedAt: string;
   periodDays: number;
   totals: {
@@ -59,10 +72,17 @@ export function computeStats(periodDays = 30): StatsResponse {
   const since = `${sinceDate}T00:00:00.000Z`;
 
   const users = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE ${notExcluded('pair_id')}`)?.n ?? 0);
-  const pairsComplete = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) >= 2)`)?.n ?? 0);
+  const pairsComplete = Number(
+    one<{ n: number }>(`SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) >= 2)`)?.n ?? 0,
+  );
   const pairsGuest = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM pairs WHERE is_guest = 1 AND ${notExcluded('id')}`)?.n ?? 0);
-  const pairsSolo = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) = 1)`)?.n ?? 0);
-  const pushSubscribed = Number(one<{ n: number }>(`SELECT COUNT(DISTINCT s.user_id) AS n FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE ${notExcluded('u.pair_id')}`)?.n ?? 0);
+  const pairsSolo = Number(
+    one<{ n: number }>(`SELECT COUNT(*) AS n FROM (SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) = 1)`)?.n ?? 0,
+  );
+  const pushSubscribed = Number(
+    one<{ n: number }>(`SELECT COUNT(DISTINCT s.user_id) AS n FROM push_subscriptions s JOIN users u ON u.id = s.user_id WHERE ${notExcluded('u.pair_id')}`)
+      ?.n ?? 0,
+  );
 
   const funnel = {
     invitesSent: count('invite_sent', since),
@@ -85,7 +105,8 @@ export function computeStats(periodDays = 30): StatsResponse {
     refSignups: count('ref_signup', since),
   };
 
-  const usersInPeriod = Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE created_at >= ? AND ${notExcluded('pair_id')}`, since)?.n ?? 0) || users;
+  const usersInPeriod =
+    Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE created_at >= ? AND ${notExcluded('pair_id')}`, since)?.n ?? 0) || users;
   const shares = funnel.invitesSent + funnel.challengesSent + funnel.weeklyShared + funnel.refShared;
   const converted = funnel.invitesAccepted + funnel.challengePairsCreated * 2 + funnel.refSignups;
   const sharesPerUser = usersInPeriod ? shares / usersInPeriod : 0;
@@ -93,7 +114,9 @@ export function computeStats(periodDays = 30): StatsResponse {
   const kFactor = { sharesPerUser: round(sharesPerUser), conversion: round(conversion), k: round(sharesPerUser * conversion) };
 
   // Близость: только полные пары, последние periodDays дней.
-  const completePairs = all<{ pair_id: string }>(`SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) >= 2`).map((r) => r.pair_id);
+  const completePairs = all<{ pair_id: string }>(`SELECT pair_id FROM users WHERE ${notExcluded('pair_id')} GROUP BY pair_id HAVING COUNT(*) >= 2`).map(
+    (r) => r.pair_id,
+  );
   let daysAny = 0;
   let daysBoth = 0;
   let revealedAnswers = 0;
@@ -134,8 +157,22 @@ export function computeStats(periodDays = 30): StatsResponse {
     const d = addDays(today, -i);
     const from = `${d}T00:00:00.000Z`;
     const to = `${addDays(d, 1)}T00:00:00.000Z`;
-    const ev = (type: string) => Number(one<{ n: number }>(`SELECT COUNT(*) AS n FROM events WHERE type = ? AND created_at >= ? AND created_at < ? AND ${notExcluded('pair_id')}`, type, from, to)?.n ?? 0);
-    const u = Number(one<{ n: number }>(`SELECT COUNT(DISTINCT user_id) AS n FROM events WHERE user_id IS NOT NULL AND created_at >= ? AND created_at < ? AND ${notExcluded('pair_id')}`, from, to)?.n ?? 0);
+    const ev = (type: string) =>
+      Number(
+        one<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM events WHERE type = ? AND created_at >= ? AND created_at < ? AND ${notExcluded('pair_id')}`,
+          type,
+          from,
+          to,
+        )?.n ?? 0,
+      );
+    const u = Number(
+      one<{ n: number }>(
+        `SELECT COUNT(DISTINCT user_id) AS n FROM events WHERE user_id IS NOT NULL AND created_at >= ? AND created_at < ? AND ${notExcluded('pair_id')}`,
+        from,
+        to,
+      )?.n ?? 0,
+    );
     daily.push({ date: d, answers: ev('answer'), reveals: ev('reveal'), gestures: ev('gesture_sent'), users: u });
   }
 
@@ -163,6 +200,7 @@ export function computeStats(periodDays = 30): StatsResponse {
 
   return {
     push,
+    badQuestions: badQuestions(),
     generatedAt: new Date().toISOString(),
     periodDays,
     totals: { users, pairsComplete, pairsGuest, pairsSolo, pushSubscribed },
@@ -175,4 +213,36 @@ export function computeStats(periodDays = 30): StatsResponse {
 
 function round(x: number): number {
   return Math.round(x * 1000) / 1000;
+}
+
+/** Отметки «плохой вопрос»: самые частые вопросы, причины и свои варианты. */
+function badQuestions(): StatsResponse['badQuestions'] {
+  const rows = all<{ question_id: string; pair_id: string; text: string; category: string; reasons: string | null; comment: string | null }>(
+    `SELECT m.question_id, m.pair_id, q.text, q.category, m.reasons, m.comment
+       FROM question_marks m JOIN questions q ON q.id = m.question_id
+      WHERE q.pair_id IS NULL AND ${notExcluded('m.pair_id')}
+      ORDER BY m.created_at DESC`,
+  );
+  const reasons: Record<string, number> = {};
+  const byQ = new Map<string, BadQuestionStat>();
+  const pairsOf = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const keys = r.reasons ? r.reasons.split(',') : ['legacy'];
+    let q = byQ.get(r.question_id);
+    if (!q) {
+      q = { id: r.question_id, text: r.text, category: r.category, marks: 0, pairs: 0, reasons: {}, comments: [] };
+      byQ.set(r.question_id, q);
+      pairsOf.set(r.question_id, new Set());
+    }
+    q.marks++;
+    pairsOf.get(r.question_id)!.add(r.pair_id);
+    q.pairs = pairsOf.get(r.question_id)!.size;
+    for (const k of keys) {
+      q.reasons[k] = (q.reasons[k] ?? 0) + 1;
+      reasons[k] = (reasons[k] ?? 0) + 1;
+    }
+    if (r.comment && q.comments.length < 3) q.comments.push(r.comment);
+  }
+  const top = [...byQ.values()].sort((a, b) => b.pairs - a.pairs || b.marks - a.marks).slice(0, 25);
+  return { total: rows.length, reasons, top };
 }

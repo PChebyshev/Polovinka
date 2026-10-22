@@ -63,8 +63,8 @@ questions                                             -- встроенные с
   a TEXT, b TEXT, why_chips TEXT (JSON), topic TEXT,  -- topic = тема на вечер
   is_active INT DEFAULT 1, created_at
 
-question_marks                                        -- «не про нас»
-  pair_id, user_id, question_id, created_at   PK(pair_id, user_id, question_id)
+question_marks                                        -- «плохой вопрос»
+  pair_id, user_id, question_id, created_at, reasons, comment   PK(pair_id, user_id, question_id)
 
 rounds
   id TEXT PK, pair_id, question_id, date TEXT (YYYY-MM-DD в tz пары),
@@ -130,7 +130,9 @@ events                                                -- аналитика, т�
 3. Слой: 60/25/15. Ограничения: `deep` не чаще 2 за последние 7 дней и не в понедельник утром;
    первые 3 дня пары — только `light`/`us`.
 4. Категория внутри слоя: вес = 1 + (доля «не угадали» в категории) × 2, минус 0.5 за каждую
-   отметку «не про нас» в категории (при трёх отметках категория выключается).
+   отметку «плохой вопрос» в категории. Тему выключают три отметки с причиной про тему
+   («не про нашу жизнь», «слишком личный», «может задеть»); «не подходит вариант», «скучный»,
+   «непонятный», «уже был похожий» убирают только сам вопрос и видны в /stats → «Плохие вопросы».
 5. Формат-сюрприз (`scale` / `who` / `from_partner`) ≈ раз в 8–12 дней, не раньше 5-го дня.
 6. Генерация детерминирована (seed = pair_id + date), чтобы оба телефона увидели один вопрос
    без гонок; строка rounds создаётся при первом запросе дня (INSERT OR IGNORE).
@@ -163,7 +165,7 @@ GET  /api/today                                           → раунд дня 
 POST /api/rounds/:id/answer          {client_id, choice, guess}
 POST /api/rounds/:id/why             {why_text|why_chip}
 POST /api/rounds/bonus                                    → новый бонусный раунд
-POST /api/questions/:id/mark         «не про нас»
+POST /api/questions/:id/mark         «плохой вопрос» {reasons[], comment?}
 POST /api/nudge                                           → «позвать» (1/день), текст для share
 POST /api/gestures                   {client_id, type, text}
 GET  /api/history?cursor=

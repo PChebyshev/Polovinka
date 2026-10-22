@@ -212,6 +212,21 @@ export const CATEGORY_LABELS: Record<string, string> = {
 
 export const LAYER_LABELS: Record<Layer, string> = { light: 'Лёгкий', us: 'Про нас', deep: 'Поглубже' };
 
+/**
+ * «Плохой вопрос»: почему. Вопрос убирается у пары в любом случае;
+ * причины с topic: true ещё и приглушают тему (три такие отметки — тема выключается).
+ */
+export const BAD_QUESTION_REASONS = [
+  { key: 'options', label: 'Не подходит ни один вариант', topic: false },
+  { key: 'not_us', label: 'Не про нашу жизнь', topic: true },
+  { key: 'too_personal', label: 'Слишком личный или неловкий', topic: true },
+  { key: 'hurtful', label: 'Может задеть или поссорить', topic: true },
+  { key: 'boring', label: 'Скучный, ответ очевиден', topic: false },
+  { key: 'unclear', label: 'Непонятно, о чём он', topic: false },
+  { key: 'repeat', label: 'Уже был похожий', topic: false },
+] as const;
+export type BadQuestionReason = (typeof BAD_QUESTION_REASONS)[number]['key'];
+
 export interface AnswerPublic {
   userId: string;
   choice: string;

@@ -105,7 +105,7 @@ export const api = {
   why: (roundId: string, data: { whyText?: string; whyChip?: string }) => request<RoundPublic>('POST', `/api/rounds/${roundId}/why`, data, { queue: true }),
   topicOpened: (roundId: string) => request<{ ok: true }>('POST', `/api/rounds/${roundId}/topic-opened`),
   bonus: () => request<RoundPublic>('POST', '/api/rounds/bonus'),
-  mark: (questionId: string) => request<{ ok: true }>('POST', `/api/questions/${questionId}/mark`),
+  mark: (questionId: string, reasons: string[] = [], comment?: string) => request<{ ok: true }>('POST', `/api/questions/${questionId}/mark`, { reasons, comment }),
   nudge: () => request<{ text: string; url: string; firstToday: boolean }>('POST', '/api/nudge'),
   sendGesture: (type: string, text: string, cid: string) => request<GesturePublic>('POST', '/api/gestures', { type, text, clientId: cid }, { queue: true }),
   gestures: () => request<{ gestures: GesturePublic[] }>('GET', '/api/gestures'),
@@ -116,7 +116,8 @@ export const api = {
     request<HistoryResponse>('GET', `/api/history?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}${favorites ? '&favorites=1' : ''}${only ? `&only=${only}` : ''}`),
   toggleFavorite: (kind: 'round' | 'gesture', refId: string) => request<{ favorite: boolean }>('POST', '/api/favorites/toggle', { kind, refId }),
   milestoneSeen: (key: string) => request<{ ok: true }>('POST', `/api/milestones/${encodeURIComponent(key)}/seen`),
-  skipRound: (roundId: string) => request<{ replaced: boolean; round: RoundPublic }>('POST', `/api/rounds/${roundId}/skip`),
+  skipRound: (roundId: string, reasons: string[], comment?: string) =>
+    request<{ replaced: boolean; round: RoundPublic }>('POST', `/api/rounds/${roundId}/skip`, { reasons, comment }),
   customQuestions: () => request<{ questions: CustomQuestion[] }>('GET', '/api/questions/custom'),
   addQuestion: (data: { text: string; a: string; b: string; layer: string; topic?: string }) => request<CustomQuestion>('POST', '/api/questions', data),
   deleteQuestion: (id: string) => request<{ ok: true }>('DELETE', `/api/questions/${id}`),
@@ -317,6 +318,11 @@ export interface CampaignStats {
 
 export interface StatsResponse {
   pmf: PmfResponse;
+  badQuestions: {
+    total: number;
+    reasons: Record<string, number>;
+    top: Array<{ id: string; text: string; category: string; marks: number; pairs: number; reasons: Record<string, number>; comments: string[] }>;
+  };
   backup: { enabled: boolean; lastAt: string | null; lastKey: string | null; lastSize: number | null; error: string | null; errorAt: string | null };
   ads: { campaigns: CampaignStats[]; organic: Omit<CampaignStats, 'id' | 'code' | 'url' | 'budget' | 'auto' | 'archived' | 'createdAt' | 'source' | 'name'> };
   generatedAt: string;

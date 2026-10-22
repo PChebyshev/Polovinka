@@ -78,11 +78,12 @@ export function Home() {
     }
   };
 
-  const skip = async (round: RoundPublic) => {
+  const skip = async (round: RoundPublic, reasons: string[], comment: string) => {
     setBusy(true);
     try {
-      const r = await api.skipRound(round.id);
+      const r = await api.skipRound(round.id, reasons, comment || undefined);
       patchRound(r.round);
+      return r.replaced;
     } finally {
       setBusy(false);
     }
@@ -101,7 +102,7 @@ export function Home() {
           round={round}
           partnerName={partner?.name ?? null}
           onAnswer={(c, g) => answer(round, c, g)}
-          onSkip={() => skip(round)}
+          onSkip={(reasons, comment) => skip(round, reasons, comment)}
           busy={busy}
           title={title}
         />

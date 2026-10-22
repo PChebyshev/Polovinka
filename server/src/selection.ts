@@ -1,4 +1,5 @@
-import { all, one, run, type PairRow, type QuestionRow, type RoundRow } from './db.js';
+import { all, one, run, logEvent, type PairRow, type QuestionRow, type RoundRow } from './db.js';
+import { BAD_QUESTION_REASONS } from '../../shared/src/types.js';
 import { newId, nowIso } from './ids.js';
 import { levelFor } from './levels.js';
 import { scoreFor } from './score.js';
@@ -92,19 +93,46 @@ function categoryStats(pairId: string): Map<string, { revealed: number; missed: 
   return m;
 }
 
+const TOPIC_REASONS = new Set<string>(BAD_QUESTION_REASONS.filter((r) => r.topic).map((r) => r.key));
+const REASON_KEYS = new Set<string>(BAD_QUESTION_REASONS.map((r) => r.key));
+
+/** Причины из запроса: только известные, без повторов. */
+export function parseReasons(raw: unknown): string[] {
+  return Array.isArray(raw) ? [...new Set(raw.filter((r): r is string => typeof r === 'string' && REASON_KEYS.has(r)))] : [];
+}
+
+/** «Плохой вопрос»: вопрос больше не придёт этой паре; причины и свой вариант — для разбора вопросов. */
+export function markQuestion(pairId: string, userId: string, questionId: string, reasons: string[], comment: unknown) {
+  const text = typeof comment === 'string' ? comment.replace(/\s+/g, ' ').trim().slice(0, 300) || null : null;
+  run(
+    `INSERT INTO question_marks (pair_id, user_id, question_id, created_at, reasons, comment) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (pair_id, user_id, question_id) DO UPDATE SET reasons = excluded.reasons, comment = excluded.comment`,
+    pairId,
+    userId,
+    questionId,
+    nowIso(),
+    reasons.length ? reasons.join(',') : null,
+    text,
+  );
+  logEvent('question_marked', { pairId, userId, meta: { question: questionId, reasons } });
+}
+
+/** Отметка приглушает тему, если причина про тему — или причин нет (старые «не про нас»). */
+const marksTopic = (reasons: string | null) => !reasons || reasons.split(',').some((r) => TOPIC_REASONS.has(r));
+
 export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
   const rnd = mulberry32(hashSeed(`${opts.pairId}|${opts.date}|${opts.kind}|${opts.seedSalt ?? ''}`));
   const allowFormats = opts.allowFormats ?? (opts.solo ? ['ab'] : ['ab', 'who', 'scale']);
   const exclude = new Set(opts.exclude ?? []);
 
   const used = new Set(all<{ question_id: string }>('SELECT question_id FROM rounds WHERE pair_id = ?', opts.pairId).map((r) => r.question_id));
-  const marked = all<{ question_id: string; category: string }>(
-    `SELECT m.question_id, q.category FROM question_marks m JOIN questions q ON q.id = m.question_id WHERE m.pair_id = ?`,
+  const marked = all<{ question_id: string; category: string; reasons: string | null }>(
+    `SELECT m.question_id, q.category, m.reasons FROM question_marks m JOIN questions q ON q.id = m.question_id WHERE m.pair_id = ?`,
     opts.pairId,
   );
   const markedIds = new Set(marked.map((m) => m.question_id));
   const marksByCategory = new Map<string, number>();
-  for (const m of marked) marksByCategory.set(m.category, (marksByCategory.get(m.category) ?? 0) + 1);
+  for (const m of marked) if (marksTopic(m.reasons)) marksByCategory.set(m.category, (marksByCategory.get(m.category) ?? 0) + 1);
 
   // Наборы вопросов открываются с уровнем пары.
   const level = levelFor(scoreFor(opts.pairId).discoveries).level;
@@ -120,9 +148,17 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
   const candidates = all<QuestionRow>(
     `SELECT * FROM questions WHERE is_active = 1 AND (pair_id IS NULL OR pair_id = ?) AND (source IS NULL OR source <> 'ai')`,
     opts.pairId,
-  ).filter((q) => isCategoryUnlocked(q.category, level) &&
-    isCategoryVisible(q.category, flags) &&
-    (q.category !== 'intimacy' || intimacyThisWeek < INTIMACY_PER_WEEK) && !used.has(q.id) && !exclude.has(q.id) && !markedIds.has(q.id) && allowFormats.includes(q.format) && (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY);
+  ).filter(
+    (q) =>
+      isCategoryUnlocked(q.category, level) &&
+      isCategoryVisible(q.category, flags) &&
+      (q.category !== 'intimacy' || intimacyThisWeek < INTIMACY_PER_WEEK) &&
+      !used.has(q.id) &&
+      !exclude.has(q.id) &&
+      !markedIds.has(q.id) &&
+      allowFormats.includes(q.format) &&
+      (marksByCategory.get(q.category) ?? 0) < MARKS_TO_DISABLE_CATEGORY,
+  );
 
   if (candidates.length === 0) return undefined;
 
@@ -145,11 +181,7 @@ export function pickQuestion(opts: PickOptions): QuestionRow | undefined {
     weekAgo,
     opts.date,
   );
-  const deepAllowed =
-    opts.kind === 'daily' &&
-    weekday !== 1 &&
-    dayIndex >= FIRST_DAYS_WITHOUT_DEEP &&
-    Number(recentDeep?.n ?? 0) < DEEP_PER_WEEK;
+  const deepAllowed = opts.kind === 'daily' && weekday !== 1 && dayIndex >= FIRST_DAYS_WITHOUT_DEEP && Number(recentDeep?.n ?? 0) < DEEP_PER_WEEK;
 
   const layers = (opts.solo ? ['light'] : ['light', 'us', 'deep']).filter((l) => (l !== 'deep' || deepAllowed) && candidates.some((q) => q.layer === l));
   const ratio = stageLayerRatio(flags.stage);
@@ -187,7 +219,15 @@ export function ensureDaily(pair: PairRow, date: string): RoundRow | undefined {
   const existing = one<RoundRow>(`SELECT * FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'daily'`, pair.id, date);
   if (existing) return existing;
   const members = one<{ n: number }>('SELECT COUNT(*) AS n FROM users WHERE pair_id = ?', pair.id);
-  const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'daily', solo: Number(members?.n ?? 1) < 2, theme: pair.week_theme });
+  const q = pickQuestion({
+    pairId: pair.id,
+    pairCreatedAt: pair.created_at,
+    tz: pair.tz,
+    date,
+    kind: 'daily',
+    solo: Number(members?.n ?? 1) < 2,
+    theme: pair.week_theme,
+  });
   if (!q) return undefined;
   run(
     `INSERT OR IGNORE INTO rounds (id, pair_id, question_id, date, kind, status, created_at) VALUES (?, ?, ?, ?, 'daily', 'open', ?)`,

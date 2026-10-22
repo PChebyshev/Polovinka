@@ -3,6 +3,7 @@ import { api, ApiError, type StatsResponse } from '../lib/api';
 import { Button, Card, Label } from '../components/ui';
 import { PmfStats } from '../components/PmfStats';
 import { AdsStats } from '../components/AdsStats';
+import { BAD_QUESTION_REASONS, CATEGORY_LABELS } from '@polovinka/shared';
 
 const KEY = 'polovinka.statsKey';
 
@@ -113,6 +114,52 @@ function BackupLine({ b }: { b: StatsResponse['backup'] }) {
   );
 }
 
+const REASON_LABEL: Record<string, string> = { ...Object.fromEntries(BAD_QUESTION_REASONS.map((r) => [r.key, r.label])), legacy: '«Не про нас» (до причин)' };
+
+/** «Плохие вопросы» за всё время: какие вопросы переписать или убрать. */
+function BadQuestions({ b }: { b: StatsResponse['badQuestions'] }) {
+  const reasons = Object.entries(b.reasons).sort((x, y) => y[1] - x[1]);
+  return (
+    <Card className="mt-6 scroll-mt-4" id="bad">
+      <Label>Плохие вопросы</Label>
+      <p className="mt-2 text-xs text-muted">
+        Всего отметок: {b.total}. Сверху — вопросы, которые отметило больше всего разных пар: их стоит переписать или убрать.
+      </p>
+      {reasons.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {reasons.map(([k, n]) => (
+            <span key={k} className="rounded-full bg-surface-2 px-2.5 py-1 text-xs">
+              {REASON_LABEL[k] ?? k} · {n}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mt-4 space-y-3">
+        {b.top.map((q) => (
+          <div key={q.id} className="border-t border-line pt-3">
+            <div className="text-sm leading-snug">{q.text}</div>
+            <div className="mt-1 text-[11px] text-muted">
+              {q.id} · {CATEGORY_LABELS[q.category] ?? q.category} · отметили {q.pairs} {q.pairs === 1 ? 'пара' : q.pairs < 5 ? 'пары' : 'пар'}
+            </div>
+            <div className="mt-1 text-xs text-muted">
+              {Object.entries(q.reasons)
+                .sort((x, y) => y[1] - x[1])
+                .map(([k, n]) => `${REASON_LABEL[k] ?? k}${n > 1 ? ` ×${n}` : ''}`)
+                .join(' · ')}
+            </div>
+            {q.comments.map((c) => (
+              <div key={c} className="mt-1 text-xs italic text-text/80">
+                «{c}»
+              </div>
+            ))}
+          </div>
+        ))}
+        {b.top.length === 0 && <p className="text-sm text-muted">Пока никто не отмечал.</p>}
+      </div>
+    </Card>
+  );
+}
+
 export function Stats() {
   const [key, setKey] = useState(() => sessionStorage.getItem(KEY) ?? '');
   const [days, setDays] = useState(30);
@@ -187,6 +234,7 @@ export function Stats() {
           ['#pmf', 'PMF'],
           ['#ads', 'Реклама'],
           ['#pairs', 'Пары'],
+          ['#bad', 'Плохие вопросы'],
         ].map(([href, label]) => (
           <a key={href} href={href} className="underline decoration-dotted">
             {label}
@@ -199,6 +247,8 @@ export function Stats() {
       <PmfStats pmf={data.pmf} statsKey={key} periodDays={data.periodDays} onChanged={load} />
 
       <AdsStats ads={data.ads} statsKey={key} periodDays={data.periodDays} onChanged={load} />
+
+      <BadQuestions b={data.badQuestions} />
 
       <Label className="mt-8">Всего</Label>
       <div className="mt-2 grid grid-cols-2 gap-2">

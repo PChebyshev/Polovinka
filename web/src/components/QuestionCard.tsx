@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { RoundPublic } from '@polovinka/shared';
-import { LAYER_LABELS } from '@polovinka/shared';
-import { Button, Card, Label } from './ui';
+import { BAD_QUESTION_REASONS, LAYER_LABELS } from '@polovinka/shared';
+import { Button, Card, Chip, Label, Sheet } from './ui';
 import { buzz } from '../lib/share';
 
 export function QuestionCard({
@@ -15,12 +15,16 @@ export function QuestionCard({
   round: RoundPublic;
   partnerName: string | null;
   onAnswer: (choice: string, guess: string | null) => void;
-  onSkip?: () => void;
+  /** «Плохой вопрос» с причинами. Возвращает, заменился ли вопрос. */
+  onSkip?: (reasons: string[], comment: string) => Promise<boolean>;
   busy: boolean;
   title?: string;
 }) {
   const [choice, setChoice] = useState<string | null>(null);
-  const [skipAsk, setSkipAsk] = useState(false);
+  const [badOpen, setBadOpen] = useState(false);
+  const [reasons, setReasons] = useState<string[]>([]);
+  const [comment, setComment] = useState('');
+  const [badNote, setBadNote] = useState<string | null>(null);
   const q = round.question;
   const them = partnerName ?? 'половинка';
   const isScale = q.format === 'scale';
@@ -46,6 +50,18 @@ export function QuestionCard({
           : isScale
             ? 'Шкала'
             : LAYER_LABELS[q.layer];
+  // Причины про тему приглушают похожие вопросы; остальные — сигнал поправить сам вопрос
+  const topicHit = reasons.some((k) => BAD_QUESTION_REASONS.find((r) => r.key === k)?.topic);
+  const afterBad = topicHit ? 'больше не придёт, и похожих станет меньше' : 'больше не придёт — мы его поправим';
+  const toggleReason = (k: string) => setReasons((r) => (r.includes(k) ? r.filter((x) => x !== k) : [...r, k]));
+  const sendBad = async () => {
+    if (!onSkip) return;
+    const replaced = await onSkip(reasons, comment.trim());
+    setBadOpen(false);
+    // Заменённый вопрос перерисует карточку целиком; иначе — короткая заметка здесь
+    if (!replaced) setBadNote(`Спасибо, учли: вопрос ${afterBad}. Сегодня можно просто ответить.`);
+  };
+
   const chosenLabel = choice === null ? '' : isScale ? `${choice} из 5` : choice === 'a' ? q.a : q.b;
 
   const options = (onPick: (v: string) => void) =>
@@ -109,23 +125,46 @@ export function QuestionCard({
 
       {onSkip && choice === null && !q.isCustom && (
         <div className="mt-4 text-center">
-          {skipAsk ? (
-            <div className="flex items-center justify-center gap-3 text-sm">
-              <span className="text-muted">Убрать такие вопросы?</span>
-              <button className="text-accent" onClick={onSkip} disabled={busy}>
-                Да, не про нас
-              </button>
-              <button className="text-muted" onClick={() => setSkipAsk(false)}>
-                Нет
-              </button>
-            </div>
+          {badNote ? (
+            <p className="text-xs text-muted">{badNote}</p>
           ) : (
-            <button className="text-xs text-muted underline decoration-dotted" onClick={() => setSkipAsk(true)}>
-              Это не про нас
+            <button className="text-xs text-muted underline decoration-dotted" onClick={() => setBadOpen(true)}>
+              Плохой вопрос
             </button>
           )}
         </div>
       )}
+
+      <Sheet open={badOpen} onClose={() => setBadOpen(false)} title="Что не так с вопросом?">
+        <p className="text-sm text-muted">Можно выбрать несколько — так мы поймём, что исправить.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {BAD_QUESTION_REASONS.map((r) => (
+            <Chip key={r.key} active={reasons.includes(r.key)} onClick={() => toggleReason(r.key)} aria-pressed={reasons.includes(r.key)}>
+              {r.label}
+            </Chip>
+          ))}
+        </div>
+        <input
+          className="mt-3 w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm outline-none focus:border-accent/60"
+          placeholder="Свой вариант или как было бы лучше"
+          maxLength={300}
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+        <p className="mt-3 text-xs text-muted">
+          {round.partnerAnswered
+            ? `${them} уже ответил(а), поэтому сегодня вопрос останется. Потом он ${afterBad}.`
+            : `Вопрос сразу заменится новым у вас обоих, а этот ${afterBad}.`}
+        </p>
+        <div className="mt-4 flex gap-3">
+          <Button variant="secondary" className="flex-1" onClick={() => setBadOpen(false)}>
+            Отмена
+          </Button>
+          <Button className="flex-1" onClick={sendBad} disabled={busy || (reasons.length === 0 && comment.trim().length < 3)}>
+            {round.partnerAnswered ? 'Отправить' : 'Заменить'}
+          </Button>
+        </div>
+      </Sheet>
     </Card>
   );
 }

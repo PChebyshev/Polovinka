@@ -5,7 +5,7 @@ import { all, one, run, transaction, logEvent, type AnswerRow, type GestureRow, 
 import { hashToken, newCode, newId, newToken, nowIso } from './ids.js';
 import { requireUser, userByToken, readToken } from './auth.js';
 import { dateInTz, isValidTz } from './time.js';
-import { pickQuestion, ensureDaily } from './selection.js';
+import { pickQuestion, ensureDaily, markQuestion, parseReasons } from './selection.js';
 import { counters, gesturePublic, pairPublic, partnerOf, roundPublic, userPublic } from './serialize.js';
 import { addClient, sendTo } from './sse.js';
 import { checkMilestones, checkCapsules, badgesCount, levelFor, unseenCelebrations } from './levels.js';
@@ -408,8 +408,8 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   app.post('/api/questions/:id/mark', { preHandler: requireUser }, async (req) => {
     const user = req.user!;
     const qid = (req.params as { id: string }).id;
-    run('INSERT OR IGNORE INTO question_marks (pair_id, user_id, question_id, created_at) VALUES (?, ?, ?, ?)', user.pair_id, user.id, qid, nowIso());
-    logEvent('question_marked', { pairId: user.pair_id, userId: user.id });
+    const body = (req.body ?? {}) as { reasons?: unknown; comment?: unknown };
+    markQuestion(user.pair_id, user.id, qid, parseReasons(body.reasons), body.comment);
     return { ok: true };
   });
 
