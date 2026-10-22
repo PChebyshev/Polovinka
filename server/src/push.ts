@@ -6,7 +6,7 @@ import { planToday } from './ideas.js';
 import { digestFor, digestReadyFor } from './digest.js';
 import { ensureDaily } from './selection.js';
 import { streakFor } from './progress.js';
-import { dateInTz } from './time.js';
+import { dateInTz, weekdayInTz } from './time.js';
 import { isOnline } from './sse.js';
 import { nowIso } from './ids.js';
 
@@ -217,22 +217,6 @@ export async function tickSchedule() {
     // Вопрос дня создаётся при первом открытии приложения. Утром его может ещё не быть — создаём сами.
     const daily = ensureDaily(pair, dateInTz(pair.tz));
 
-    // Понедельник: утреннее уведомление — про итоги прошлой недели (вопрос дня увидят, открыв приложение)
-    if (inWindow(u.notif_morning) && !isOnline(u.id)) {
-      const ready = digestReadyFor(u, pair);
-      const digest = ready ? await digestFor(pair, ready.weekStart, { warn: () => undefined }) : null;
-      if (digest && digest.source !== 'quiet') {
-        const t = digest.story.title;
-        await sendPush(u, 'morning', {
-          title: 'Ваша неделя: итоги готовы',
-          body: t.length > 90 ? t.slice(0, 87) + '…' : t,
-          url: '/week',
-          tag: 'morning',
-        });
-        continue;
-      }
-    }
-
     if (inWindow(u.notif_morning)) {
       const answered = daily ? one('SELECT 1 FROM answers WHERE round_id = ? AND user_id = ?', daily.id, u.id) : null;
       if (daily && !answered && !isOnline(u.id)) {
@@ -251,7 +235,18 @@ export async function tickSchedule() {
 
     if (inWindow(u.notif_evening) && daily) {
       const mine = one('SELECT 1 FROM answers WHERE round_id = ? AND user_id = ?', daily.id, u.id);
-      if (daily.status === 'revealed') {
+      // Воскресенье: вечернее уведомление — про итоги недели (раскрытие ждёт там же, на главной)
+      const ready = daily.status === 'revealed' && weekdayInTz(pair.tz) === 0 ? digestReadyFor(u, pair) : null;
+      const digest = ready ? await digestFor(pair, ready.weekStart, { warn: () => undefined }) : null;
+      if (digest && digest.source !== 'quiet') {
+        const t = digest.story.title;
+        await sendPush(u, 'evening', {
+          title: 'Ваша неделя: итоги готовы',
+          body: `«${t.length > 80 ? t.slice(0, 77) + '…' : t}» — и сегодняшнее раскрытие тоже ждёт.`,
+          url: '/',
+          tag: 'evening',
+        });
+      } else if (daily.status === 'revealed') {
         await sendPush(u, 'evening', {
           title: 'Раскрытие готово',
           body: partner ? `Посмотрите, совпали ли вы с ${partner.name} сегодня.` : 'Посмотрите, совпали ли вы сегодня.',
@@ -285,7 +280,14 @@ export async function pushReveal(user: UserRow, partnerName: string, hits: { iGu
         : hits.theyGuessed
           ? `${partnerName} знает ваш ответ. Посмотрите, что выбрали вы оба.`
           : `Вы узнали друг о друге новое. Посмотрите.`;
-  await sendPush(user, 'evening', { title: 'Раскрытие готово', body, url: '/', tag: 'evening' });
+  // В воскресенье раскрытие открывает и итоги недели
+  const sunday = weekdayInTz(user.tz) === 0;
+  await sendPush(user, 'evening', {
+    title: sunday ? 'Раскрытие и итоги недели' : 'Раскрытие готово',
+    body: sunday ? `${body} А ещё готовы итоги вашей недели.` : body,
+    url: '/',
+    tag: 'evening',
+  });
 }
 
 /**

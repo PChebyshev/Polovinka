@@ -226,7 +226,7 @@ export function Home() {
           </Link>
         )}
 
-        {isSunday && partner && (
+        {isSunday && partner && !me.digestReady && (
           <Link to="/week?tab=card" className="block rounded-2xl border border-sand/40 bg-sand/10 px-4 py-3">
             <div className="text-xs uppercase tracking-wider text-muted">Воскресенье</div>
             <div className="mt-1 text-sm">Карточка недели для сторис готова — поделиться →</div>

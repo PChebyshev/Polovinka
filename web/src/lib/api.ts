@@ -126,7 +126,8 @@ export const api = {
   setTheme: (theme: string | null) => request<MeResponse>('PUT', '/api/pair/theme', { theme }),
   // Этап 3
   week: (offset = 0) => request<WeekResponse>('GET', `/api/week?offset=${offset}`),
-  weekDigest: (offset = 1) => request<DigestResponse>('GET', `/api/week/digest?offset=${offset}`),
+  /** Без offset — самые свежие итоги (в воскресенье — этой недели). */
+  weekDigest: (offset?: number) => request<DigestResponse>('GET', `/api/week/digest${offset === undefined ? '' : `?offset=${offset}`}`),
   weekPublic: (code: string) => request<WeekPublic>('GET', `/api/week/public/${encodeURIComponent(code)}`),
   weekShared: (via: string) => request<{ ok: true }>('POST', `/api/week/x/shared`, { via }),
   uploadWeekImage: async (code: string, blob: Blob) => {

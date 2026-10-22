@@ -11,7 +11,7 @@ import { Button, Card, Label, Spinner } from '../components/ui';
 /** Итоги недели: листаем назад по неделям. */
 function DigestTab() {
   const { refresh } = useStore();
-  const [offset, setOffset] = useState(1);
+  const [offset, setOffset] = useState<number | undefined>(undefined);
   const [res, setRes] = useState<DigestResponse | null>(null);
   useEffect(() => {
     setRes(null);
@@ -28,11 +28,11 @@ function DigestTab() {
   return (
     <div className="mt-4">
       <div className="mb-3 flex items-center justify-between text-sm">
-        <button className="text-muted disabled:opacity-30" onClick={() => setOffset(offset + 1)} disabled={!res.hasOlder}>
+        <button className="text-muted disabled:opacity-30" onClick={() => setOffset(res.offset + 1)} disabled={!res.hasOlder}>
           ← раньше
         </button>
         <span className="text-muted">{weekRange(res.weekStart, res.weekEnd)}</span>
-        <button className="text-muted disabled:opacity-30" onClick={() => setOffset(offset - 1)} disabled={offset <= 1}>
+        <button className="text-muted disabled:opacity-30" onClick={() => setOffset(res.offset - 1)} disabled={!res.hasNewer}>
           позже →
         </button>
       </div>

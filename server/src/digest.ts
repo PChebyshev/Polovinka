@@ -12,7 +12,8 @@ import { answerLabel, guessed, PARTNER_LABEL, sameChoice } from './ideas.js';
 import { curatedIdeas } from './ideasContent.js';
 
 /**
- * «Ваша неделя»: раз в неделю, в понедельник — итоги прошлой недели пары.
+ * «Ваша неделя»: раз в неделю, в воскресенье — итоги недели пары (с понедельника по воскресенье).
+ * Собираются, когда раскрыт воскресный вопрос дня, или с 20:00, если раскрытия нет.
  * Цифры и моменты считаются из ответов; текст пишет ИИ (или шаблон, если ИИ выключен).
  * В ИИ уходят ответы и метки {A}/{B} вместо имён; имена подставляем сами.
  * Вопросы из «Близости» в итоги не попадают.
@@ -30,9 +31,25 @@ function mondayOf(tz: string): string {
   return addDays(today, -((weekdayInTz(tz) + 6) % 7));
 }
 
-/** Начало недели offset недель назад (1 — прошлая). */
+/** Начало недели offset недель назад (0 — эта, 1 — прошлая). */
 export function digestWeekStart(tz: string, offset: number): string {
   return addDays(mondayOf(tz), -7 * offset);
+}
+
+const SUNDAY_EVENING = 20;
+const localHour = (tz: string) => Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false }).format(new Date())) % 24;
+const isSunday = (tz: string) => weekdayInTz(tz) === 0;
+
+/** Воскресенье, и итоги этой недели уже можно собирать: вопрос дня раскрыт или наступил вечер. */
+export function sundayReady(pair: PairRow): boolean {
+  if (!isSunday(pair.tz)) return false;
+  if (localHour(pair.tz) >= SUNDAY_EVENING) return true;
+  return !!one(`SELECT 1 FROM rounds WHERE pair_id = ? AND kind = 'daily' AND date = ? AND status = 'revealed'`, pair.id, dateInTz(pair.tz));
+}
+
+/** Самые свежие итоги: в воскресенье (когда готовы) — эта неделя, иначе прошлая. */
+export function freshOffset(pair: PairRow): number {
+  return sundayReady(pair) ? 0 : 1;
 }
 
 interface RoundFacts {
@@ -296,7 +313,8 @@ export async function digestFor(pair: PairRow, start: string, log: { warn: (s: s
   const saved = one<{ data: string }>('SELECT data FROM week_digests WHERE pair_id = ? AND week_start = ?', pair.id, start);
   if (saved) return JSON.parse(saved.data) as WeekDigest;
   const end = addDays(start, 6);
-  if (dateInTz(pair.tz) <= end || pair.is_guest) return null;
+  const today = dateInTz(pair.tz);
+  if (pair.is_guest || today < end || (today === end && !sundayReady(pair))) return null;
   const users = members(pair.id);
   const since = pairSince(pair.id, users);
   // Пара собралась позже конца недели — итогов за неё нет
@@ -361,11 +379,12 @@ export async function digestFor(pair: PairRow, start: string, log: { warn: (s: s
   return JSON.parse(stored.data) as WeekDigest;
 }
 
-/** Для главной: итоги прошлой недели ждут (пн–ср), если человек их ещё не открыл. */
+/** Для главной: итоги ждут с воскресенья до среды, пока человек их не открыл. */
 export function digestReadyFor(user: UserRow, pair: PairRow): { weekStart: string; title: string | null } | null {
   if (pair.is_guest) return null;
-  if ((weekdayInTz(pair.tz) + 6) % 7 > 2) return null;
-  const start = digestWeekStart(pair.tz, 1);
+  const day = (weekdayInTz(pair.tz) + 6) % 7; // 0 — понедельник, 6 — воскресенье
+  if (day === 6 ? !sundayReady(pair) : day > 2) return null;
+  const start = digestWeekStart(pair.tz, day === 6 ? 0 : 1);
   if (one('SELECT 1 FROM digest_seen WHERE user_id = ? AND week_start = ?', user.id, start)) return null;
   const since = pairSince(pair.id, members(pair.id));
   if (!since || since > addDays(start, 6)) return null;
@@ -374,17 +393,16 @@ export function digestReadyFor(user: UserRow, pair: PairRow): { weekStart: strin
   return { weekStart: start, title: saved ? (JSON.parse(saved.data) as WeekDigest).story.title : null };
 }
 
-/** Собрать итоги заранее — в понедельник с 5 утра по времени пары, чтобы к утреннему уведомлению всё было готово. */
+/** Собрать итоги заранее: в воскресенье, как только можно, — к вечернему уведомлению; пн–ср — если почему-то не собрались. */
 export async function warmDigests(log: { warn: (s: string) => void }) {
   const pairs = all<PairRow>(
     `SELECT p.* FROM pairs p WHERE p.is_guest = 0 AND p.deleted_at IS NULL AND (SELECT COUNT(*) FROM users u WHERE u.pair_id = p.id) >= 2`,
   );
   let made = 0;
   for (const pair of pairs) {
-    if ((weekdayInTz(pair.tz) + 6) % 7 !== 0) continue;
-    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: pair.tz, hour: '2-digit', hour12: false }).format(new Date()));
-    if (hour < 5) continue;
-    const start = digestWeekStart(pair.tz, 1);
+    const day = (weekdayInTz(pair.tz) + 6) % 7;
+    if (day === 6 ? !sundayReady(pair) : day > 2) continue;
+    const start = digestWeekStart(pair.tz, day === 6 ? 0 : 1);
     if (one('SELECT 1 FROM week_digests WHERE pair_id = ? AND week_start = ?', pair.id, start)) continue;
     await digestFor(pair, start, log);
     if (++made >= 20) break;
@@ -400,11 +418,13 @@ export function startDigests(log: { warn: (s: string) => void }) {
 }
 
 export async function registerDigestRoutes(app: FastifyInstance) {
-  /** Итоги недели offset недель назад (1 — прошлая, до 12). Открытие отмечается. */
+  /** Итоги недели offset недель назад (0 — эта, в воскресенье; без offset — самые свежие). Открытие отмечается. */
   app.get('/api/week/digest', { preHandler: requireUser }, async (req) => {
     const user = req.user!;
     const pair = one<PairRow>('SELECT * FROM pairs WHERE id = ?', user.pair_id)!;
-    const offset = Math.min(12, Math.max(1, Number((req.query as { offset?: string }).offset) || 1));
+    const fresh = freshOffset(pair);
+    const raw = (req.query as { offset?: string }).offset;
+    const offset = Math.min(12, Math.max(fresh, raw === undefined ? fresh : Number(raw) || 0));
     const start = digestWeekStart(pair.tz, offset);
     const digest = await digestFor(pair, start, app.log);
     if (digest && !one('SELECT 1 FROM digest_seen WHERE user_id = ? AND week_start = ?', user.id, start)) {
@@ -416,6 +436,8 @@ export async function registerDigestRoutes(app: FastifyInstance) {
       weekStart: start,
       weekEnd: addDays(start, 6),
       digest,
+      offset,
+      hasNewer: offset > fresh,
       hasOlder: offset < 12 && !!joined && joined <= addDays(start, -1),
     };
     return res;

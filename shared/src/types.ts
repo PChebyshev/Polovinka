@@ -468,6 +468,9 @@ export interface DigestResponse {
   weekEnd: string;
   /** null — неделя ещё идёт или пара ещё не собралась. */
   digest: WeekDigest | null;
+  /** 0 — эта неделя (в воскресенье), 1 — прошлая и т. д. */
+  offset: number;
+  hasNewer: boolean;
   /** Есть ли итоги неделей раньше — для листания. */
   hasOlder: boolean;
 }
