@@ -218,6 +218,7 @@ export const LAYER_LABELS: Record<Layer, string> = { light: 'Лёгкий', us: 
  */
 export const BAD_QUESTION_REASONS = [
   { key: 'options', label: 'Не подходит ни один вариант', topic: false },
+  { key: 'both', label: 'Подходят оба варианта', topic: false },
   { key: 'not_us', label: 'Не про нашу жизнь', topic: true },
   { key: 'too_personal', label: 'Слишком личный или неловкий', topic: true },
   { key: 'hurtful', label: 'Может задеть или поссорить', topic: true },
