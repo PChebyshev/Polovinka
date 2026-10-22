@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { all, one, run, type PairRow, type UserRow } from './db.js';
 import { planToday } from './ideas.js';
+import { digestFor, digestReadyFor } from './digest.js';
 import { ensureDaily } from './selection.js';
 import { streakFor } from './progress.js';
 import { dateInTz } from './time.js';
@@ -137,7 +138,10 @@ export async function sendPush(user: UserRow, kind: 'morning' | 'evening', paylo
   let ok = false;
   for (const s of subs) {
     try {
-      const res = await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 6 * 3600, urgency: 'normal' });
+      const res = await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), {
+        TTL: 6 * 3600,
+        urgency: 'normal',
+      });
       if (s.failed_at) run('UPDATE push_subscriptions SET failed_at = NULL WHERE id = ?', s.id);
       logPush(user.id, kind, s.endpoint, res.statusCode, true, null);
       ok = true;
@@ -213,6 +217,22 @@ export async function tickSchedule() {
     // Вопрос дня создаётся при первом открытии приложения. Утром его может ещё не быть — создаём сами.
     const daily = ensureDaily(pair, dateInTz(pair.tz));
 
+    // Понедельник: утреннее уведомление — про итоги прошлой недели (вопрос дня увидят, открыв приложение)
+    if (inWindow(u.notif_morning) && !isOnline(u.id)) {
+      const ready = digestReadyFor(u, pair);
+      const digest = ready ? await digestFor(pair, ready.weekStart, { warn: () => undefined }) : null;
+      if (digest && digest.source !== 'quiet') {
+        const t = digest.story.title;
+        await sendPush(u, 'morning', {
+          title: 'Ваша неделя: итоги готовы',
+          body: t.length > 90 ? t.slice(0, 87) + '…' : t,
+          url: '/week',
+          tag: 'morning',
+        });
+        continue;
+      }
+    }
+
     if (inWindow(u.notif_morning)) {
       const answered = daily ? one('SELECT 1 FROM answers WHERE round_id = ? AND user_id = ?', daily.id, u.id) : null;
       if (daily && !answered && !isOnline(u.id)) {
@@ -220,7 +240,9 @@ export async function tickSchedule() {
         const plan = planToday(pair.id, dateInTz(pair.tz));
         await sendPush(u, 'morning', {
           title: plan ? `Сегодня у вас: ${plan.length > 60 ? plan.slice(0, 57) + '…' : plan}` : 'Вопрос дня ждёт',
-          body: q ? `«${stripColon(q.text.replaceAll('{me}', u.name).replaceAll('{partner}', partner?.name ?? 'половинка'))}» — это 20 секунд.` : 'Два тапа, и вы на шаг ближе.',
+          body: q
+            ? `«${stripColon(q.text.replaceAll('{me}', u.name).replaceAll('{partner}', partner?.name ?? 'половинка'))}» — это 20 секунд.`
+            : 'Два тапа, и вы на шаг ближе.',
           url: '/',
           tag: 'morning',
         });
@@ -241,7 +263,9 @@ export async function tickSchedule() {
         const streakNote = st.current >= 2 ? ` Это будет ${st.current + 1}-й день подряд.` : '';
         await sendPush(u, 'evening', {
           title: 'Вопрос дня ещё ждёт',
-          body: (partner ? `${partner.name} уже ответил(а). Ваш ответ — и будет раскрытие.` : 'Ответьте, когда будет минутка. Вопрос никуда не денется.') + streakNote,
+          body:
+            (partner ? `${partner.name} уже ответил(а). Ваш ответ — и будет раскрытие.` : 'Ответьте, когда будет минутка. Вопрос никуда не денется.') +
+            streakNote,
           url: '/',
           tag: 'evening',
         });

@@ -110,19 +110,19 @@ function stageLabel(stage: string | null | undefined): string {
 }
 
 /** Ответ человека словами: вариант вопроса, «себя / половинку» или число на шкале. */
-function answerLabel(q: QuestionRow, a: AnswerRow | undefined, me: string, them: string): string {
+export function answerLabel(q: QuestionRow, a: AnswerRow | undefined, me: string, them: string): string {
   if (!a) return '—';
   if (q.format === 'scale') return `${a.choice} из 5 (1 — ${renderText(q.a, me, them)}, 5 — ${renderText(q.b, me, them)})`;
   if (q.format === 'who') return a.choice === a.user_id ? 'назвал(а) себя' : 'назвал(а) партнёра';
   return renderText(a.choice === 'a' ? q.a : q.b, me, them);
 }
 
-function sameChoice(q: QuestionRow, x: AnswerRow, y: AnswerRow): boolean {
+export function sameChoice(q: QuestionRow, x: AnswerRow, y: AnswerRow): boolean {
   if (q.format === 'scale') return Math.abs(Number(x.choice) - Number(y.choice)) <= 1;
   return x.choice === y.choice;
 }
 
-function guessed(q: QuestionRow, guesser: AnswerRow, other: AnswerRow): boolean {
+export function guessed(q: QuestionRow, guesser: AnswerRow, other: AnswerRow): boolean {
   if (guesser.guess === null) return false;
   if (q.format === 'scale') return Math.abs(Number(guesser.guess) - Number(other.choice)) <= 1;
   return guesser.guess === other.choice;
@@ -146,7 +146,7 @@ const IDEAS_SCHEMA = {
 };
 
 /** «Партнёр 1/2» — служебные метки для модели, в тексте для людей их быть не должно. */
-const PARTNER_LABEL = /партн[её]р\S*\s*[12]/i;
+export const PARTNER_LABEL = /партн[её]р\S*\s*[12]/i;
 
 function cleanIdeas(raw: unknown): RoundIdea[] | null {
   const list = (raw as { ideas?: unknown })?.ideas;

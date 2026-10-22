@@ -1,6 +1,6 @@
 import { enqueue } from './queue';
 import { storedAttr } from './attr';
-import type { BookResponse, CapsulePublic, CareHint, Idea, MemoryCard, PairStage, RoundIdea, TopicProgress } from '@polovinka/shared';
+import type { BookResponse, CapsulePublic, CareHint, DigestResponse, Idea, MemoryCard, PairStage, RoundIdea, TopicProgress } from '@polovinka/shared';
 import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
@@ -126,6 +126,7 @@ export const api = {
   setTheme: (theme: string | null) => request<MeResponse>('PUT', '/api/pair/theme', { theme }),
   // Этап 3
   week: (offset = 0) => request<WeekResponse>('GET', `/api/week?offset=${offset}`),
+  weekDigest: (offset = 1) => request<DigestResponse>('GET', `/api/week/digest?offset=${offset}`),
   weekPublic: (code: string) => request<WeekPublic>('GET', `/api/week/public/${encodeURIComponent(code)}`),
   weekShared: (via: string) => request<{ ok: true }>('POST', `/api/week/x/shared`, { via }),
   uploadWeekImage: async (code: string, blob: Blob) => {

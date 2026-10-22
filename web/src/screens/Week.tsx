@@ -1,12 +1,80 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WeekResponse } from '@polovinka/shared';
+import { useSearchParams } from 'react-router-dom';
+import type { DigestResponse, WeekResponse } from '@polovinka/shared';
+import { WeekDigestView, weekRange } from '../components/WeekDigestView';
 import { api } from '../lib/api';
 import { useStore } from '../lib/store';
 import { shareText } from '../lib/share';
 import { canvasToBlob, drawWeekCard } from '../lib/weekCard';
 import { Button, Card, Label, Spinner } from '../components/ui';
 
+/** Итоги недели: листаем назад по неделям. */
+function DigestTab() {
+  const { refresh } = useStore();
+  const [offset, setOffset] = useState(1);
+  const [res, setRes] = useState<DigestResponse | null>(null);
+  useEffect(() => {
+    setRes(null);
+    api
+      .weekDigest(offset)
+      .then((r) => {
+        setRes(r);
+        void refresh();
+      })
+      .catch(() => setRes(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offset]);
+  if (!res) return <Spinner />;
+  return (
+    <div className="mt-4">
+      <div className="mb-3 flex items-center justify-between text-sm">
+        <button className="text-muted disabled:opacity-30" onClick={() => setOffset(offset + 1)} disabled={!res.hasOlder}>
+          ← раньше
+        </button>
+        <span className="text-muted">{weekRange(res.weekStart, res.weekEnd)}</span>
+        <button className="text-muted disabled:opacity-30" onClick={() => setOffset(offset - 1)} disabled={offset <= 1}>
+          позже →
+        </button>
+      </div>
+      {res.digest ? (
+        <WeekDigestView d={res.digest} />
+      ) : (
+        <Card>
+          <p className="text-muted">За эту неделю итогов нет: вы тогда ещё не были вдвоём в Половинке.</p>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export function Week() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('tab') === 'card' ? 'card' : 'digest';
+  return (
+    <div className="mx-auto max-w-md px-4 pb-28 pt-4">
+      <h1 className="text-2xl font-bold">Неделя</h1>
+      <div className="mt-3 grid grid-cols-2 gap-1 rounded-full bg-surface-2 p-1 text-sm">
+        {(
+          [
+            ['digest', 'Итоги'],
+            ['card', 'Карточка для сторис'],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            className={`rounded-full py-2 ${tab === k ? 'bg-accent text-bg' : 'text-muted'}`}
+            onClick={() => setParams(k === 'card' ? { tab: 'card' } : {}, { replace: true })}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'digest' ? <DigestTab /> : <ShareCard />}
+    </div>
+  );
+}
+
+function ShareCard() {
   const { me } = useStore();
   const [week, setWeek] = useState<WeekResponse | null>(null);
   const [offset, setOffset] = useState(0);
@@ -16,7 +84,10 @@ export function Week() {
 
   useEffect(() => {
     setWeek(null);
-    api.week(offset).then(setWeek).catch(() => setWeek(null));
+    api
+      .week(offset)
+      .then(setWeek)
+      .catch(() => setWeek(null));
   }, [offset]);
 
   useEffect(() => {
@@ -68,9 +139,8 @@ export function Week() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-4 pb-28 pt-4">
-      <h1 className="text-2xl font-bold">Итог недели</h1>
-      <div className="mt-2 flex gap-2">
+    <div>
+      <div className="mt-4 flex gap-2">
         <button className={`rounded-full px-4 py-2 text-sm ${offset === 0 ? 'bg-accent text-bg' : 'bg-surface-2 text-muted'}`} onClick={() => setOffset(0)}>
           Эта неделя
         </button>

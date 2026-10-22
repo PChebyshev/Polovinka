@@ -306,3 +306,20 @@ CREATE TABLE IF NOT EXISTS challenge_hidden (
   created_at TEXT NOT NULL,
   PRIMARY KEY (pair_id, challenge_id)
 );
+
+-- «Ваша неделя»: итоги прошлой недели, один раз на пару
+CREATE TABLE IF NOT EXISTS week_digests (
+  pair_id TEXT NOT NULL,
+  week_start TEXT NOT NULL,
+  data TEXT NOT NULL,
+  source TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (pair_id, week_start)
+);
+
+CREATE TABLE IF NOT EXISTS digest_seen (
+  user_id TEXT NOT NULL,
+  week_start TEXT NOT NULL,
+  seen_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, week_start)
+);

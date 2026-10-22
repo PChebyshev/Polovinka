@@ -336,6 +336,8 @@ export interface MeResponse {
   ideasOpen: number;
   /** Ближайшие планы пары: сегодня и в ближайшие 7 дней. */
   upcoming: Idea[];
+  /** Итоги прошлой недели готовы и ещё не открыты (пн–ср). */
+  digestReady: { weekStart: string; title: string | null } | null;
   /** Пора показать короткий опрос о Половинке. */
   surveyDue: boolean;
 }
@@ -412,6 +414,62 @@ export interface WeekResponse {
   stats: WeekStats;
   isCurrent: boolean;
   hasImage: boolean;
+}
+
+/** День недели в итогах: ответили оба / один / никто, и совпали ли выборы. */
+export interface DigestDay {
+  date: string;
+  state: 'both' | 'one' | 'none';
+  match: boolean;
+}
+
+/** Вопрос недели с ответами обоих — «совпадение» или «сюрприз». */
+export interface DigestMoment {
+  question: string;
+  /** Ответы по порядку имён пары. */
+  answers: [string, string];
+  same: boolean;
+  /** Угадал ли каждый ответ другого. */
+  guessed: [boolean, boolean];
+}
+
+/** Тексты итогов: от ИИ или по шаблону. Имена уже подставлены. */
+export interface DigestStory {
+  title: string;
+  story: string;
+  discoveries: string[];
+  insight: string | null;
+  tips: string[];
+  question: string | null;
+}
+
+/** «Ваша неделя»: раз в неделю, после воскресенья. */
+export interface WeekDigest {
+  weekStart: string;
+  weekEnd: string;
+  names: [string, string];
+  days: DigestDay[];
+  revealed: number;
+  matches: number;
+  guessesRight: number;
+  guessesTotal: number;
+  gestures: number;
+  ideasAdded: number;
+  ideasDone: string[];
+  topics: string[];
+  matchMoment: DigestMoment | null;
+  surpriseMoment: DigestMoment | null;
+  story: DigestStory;
+  source: 'ai' | 'template' | 'quiet';
+}
+
+export interface DigestResponse {
+  weekStart: string;
+  weekEnd: string;
+  /** null — неделя ещё идёт или пара ещё не собралась. */
+  digest: WeekDigest | null;
+  /** Есть ли итоги неделей раньше — для листания. */
+  hasOlder: boolean;
 }
 
 export interface WeekPublic {

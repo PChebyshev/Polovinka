@@ -19,6 +19,7 @@ import { registerAccessRoutes, accessState } from './access.js';
 import { registerRecommendRoutes, refPair } from './recommend.js';
 import { registerMemoryRoutes } from './memories.js';
 import { registerIdeaRoutes, ideasOpen, prefsFor, upcomingPlans } from './ideas.js';
+import { digestReadyFor, registerDigestRoutes, startDigests } from './digest.js';
 import { aiEnabled } from './ai.js';
 import { surveyDue, trackAppOpen } from './pmf.js';
 import { campaignForSignup } from './campaigns.js';
@@ -91,6 +92,7 @@ function meResponse(user: UserRow): MeResponse {
     ai: aiEnabled(),
     ideasOpen: ideasOpen(pair.id),
     upcoming: upcomingPlans(pair.id),
+    digestReady: digestReadyFor(user, pair),
     surveyDue: surveyDue(user),
   };
 }
@@ -184,6 +186,8 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
   await registerRecommendRoutes(app);
   await registerMemoryRoutes(app);
   await registerIdeaRoutes(app, { meResponse });
+  await registerDigestRoutes(app);
+  startDigests(app.log);
 
   app.put('/api/me', { preHandler: requireUser }, async (req, reply) => {
     const body = (req.body ?? {}) as { name?: unknown; tz?: unknown; notifMorning?: unknown; notifEvening?: unknown; notifEnabled?: unknown };

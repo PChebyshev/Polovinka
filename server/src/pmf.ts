@@ -62,6 +62,7 @@ const FEATURES: Feature[] = [
   { key: 'custom', label: 'Свои вопросы', events: ['custom_question_added'] },
   { key: 'theme', label: 'Тема недели', events: ['theme_set'] },
   { key: 'favorite', label: 'Избранное', events: ['favorite_added'] },
+  { key: 'digest', label: 'Итоги недели: открыли', events: ['digest_opened'] },
   { key: 'week', label: 'Итог недели: поделились', events: ['weekly_shared'] },
   { key: 'challenge', label: 'Вызов паре', events: ['challenge_sent'] },
   { key: 'recommend', label: 'Совет друзьям', events: ['ref_shared'] },

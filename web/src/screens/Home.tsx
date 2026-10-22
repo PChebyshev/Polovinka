@@ -218,10 +218,18 @@ export function Home() {
           </Card>
         )}
 
+        {me.digestReady && (
+          <Link to="/week" className="block rounded-3xl border border-lilac/40 bg-lilac/10 px-5 py-4">
+            <div className="text-xs font-semibold uppercase tracking-wider text-lilac">Ваша неделя ✦</div>
+            <div className="mt-1 font-semibold leading-snug">{me.digestReady.title ?? 'Итоги прошлой недели готовы'}</div>
+            <div className="mt-1 text-sm text-muted">Что вы узнали друг о друге и идеи на эту неделю →</div>
+          </Link>
+        )}
+
         {isSunday && partner && (
-          <Link to="/week" className="block rounded-2xl border border-sand/40 bg-sand/10 px-4 py-3">
+          <Link to="/week?tab=card" className="block rounded-2xl border border-sand/40 bg-sand/10 px-4 py-3">
             <div className="text-xs uppercase tracking-wider text-muted">Воскресенье</div>
-            <div className="mt-1 text-sm">Итог недели готов. Посмотреть и поделиться →</div>
+            <div className="mt-1 text-sm">Карточка недели для сторис готова — поделиться →</div>
           </Link>
         )}
 
