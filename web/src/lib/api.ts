@@ -193,7 +193,7 @@ export const api = {
   statsExcludeMe: (key: string) => request<{ ok: true }>('POST', `/api/stats/exclude-me?key=${encodeURIComponent(key)}`, {}),
   statsExclude: (key: string, pairId: string) => request<{ ok: true }>('POST', `/api/stats/exclude/${pairId}?key=${encodeURIComponent(key)}`, {}),
   statsInclude: (key: string, pairId: string) => request<{ ok: true }>('DELETE', `/api/stats/exclude/${pairId}?key=${encodeURIComponent(key)}`),
-  needs: (ranks: string[], other?: string) => request<MeResponse>('POST', '/api/needs', { ranks, other }),
+  needs: (ranks: string[], other?: string, gender?: 'm' | 'f') => request<MeResponse>('POST', '/api/needs', { ranks, other, gender }),
   survey: (body: { disappoint: 'very' | 'somewhat' | 'not'; benefit?: string; missing?: string }) => request<MeResponse>('POST', '/api/survey', body),
 };
 
@@ -278,7 +278,8 @@ export interface PmfResponse {
     shown: number;
     items: Array<{ key: string; label: string; score: number; first: number; top3: number }>;
     byStage: Array<{ stage: string; responses: number; top: string[] }>;
-    texts: Array<{ at: string; stage: string; text: string; first: string }>;
+    byGender: Array<{ gender: 'm' | 'f'; responses: number; items: Array<{ key: string; label: string; score: number; first: number; top3: number }> }>;
+    texts: Array<{ at: string; stage: string; gender: string | null; text: string; first: string }>;
   };
   survey: {
     responses: number;

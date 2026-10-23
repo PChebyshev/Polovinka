@@ -26,6 +26,8 @@ export interface UserRow {
   email_verified_at?: string | null;
   intimacy_ok?: number;
   care_hints?: number;
+  /** m | f | null — из опроса о потребностях, для статистики. */
+  gender?: string | null;
 }
 
 export interface PairRow {
@@ -128,6 +130,8 @@ function migrate() {
   if (!has('pairs', 'has_kids')) db.exec('ALTER TABLE pairs ADD COLUMN has_kids INTEGER');
   if (!has('users', 'intimacy_ok')) db.exec('ALTER TABLE users ADD COLUMN intimacy_ok INTEGER NOT NULL DEFAULT 0');
   if (!has('users', 'care_hints')) db.exec('ALTER TABLE users ADD COLUMN care_hints INTEGER NOT NULL DEFAULT 1');
+  // Пол — необязательный ответ в опросе о потребностях, только для статистики
+  if (!has('users', 'gender')) db.exec('ALTER TABLE users ADD COLUMN gender TEXT');
   // Вопросы: «меняется со временем» и источник (ai — составлен по истории пары)
   if (!has('questions', 'changeable')) db.exec('ALTER TABLE questions ADD COLUMN changeable INTEGER NOT NULL DEFAULT 0');
   if (!has('questions', 'source')) db.exec('ALTER TABLE questions ADD COLUMN source TEXT');

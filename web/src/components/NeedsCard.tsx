@@ -30,6 +30,7 @@ export function NeedsCard() {
   });
   const [picked, setPicked] = useState<string[]>([]);
   const [other, setOther] = useState('');
+  const [gender, setGender] = useState<'m' | 'f' | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const items = useMemo(() => shuffled(me?.user.id ?? ''), [me?.user.id]);
@@ -63,7 +64,7 @@ export function NeedsCard() {
     if (picked.length !== NEEDS_PICK) return;
     setBusy(true);
     try {
-      const m = await api.needs(picked, other.trim() || undefined);
+      const m = await api.needs(picked, other.trim() || undefined, gender ?? undefined);
       setDone(true);
       window.setTimeout(() => setMe(m), 2500);
     } finally {
@@ -102,7 +103,28 @@ export function NeedsCard() {
         })}
       </div>
       {left === 0 && (
-        <label className="mt-4 block text-sm text-muted">
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+          <span>Вы:</span>
+          {(
+            [
+              ['m', 'мужчина'],
+              ['f', 'женщина'],
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setGender(gender === k ? null : k)}
+              aria-pressed={gender === k}
+              className={`rounded-full border px-3 py-1.5 ${gender === k ? 'border-accent bg-accent/15 text-text' : 'border-line bg-surface-2'}`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="text-xs">необязательно</span>
+        </div>
+      )}
+      {left === 0 && (
+        <label className="mt-3 block text-sm text-muted">
           Своими словами: чего не хватает сейчас? Необязательно
           <input
             className="mt-1 w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm outline-none focus:border-accent/60"

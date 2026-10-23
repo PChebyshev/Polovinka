@@ -284,6 +284,20 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
                 ))}
               </tbody>
             </table>
+            {pmf.needs.byGender.length > 0 && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {pmf.needs.byGender.map((g) => (
+                  <div key={g.gender} className="rounded-2xl bg-surface-2 p-3">
+                    <div className="text-xs text-muted">
+                      {g.gender === 'm' ? 'Мужчины' : 'Женщины'} · {g.responses}
+                    </div>
+                    <div className="mt-2">
+                      <BarList rows={g.items.filter((i) => i.score > 0).map((i) => [i.label, i.score])} wide />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {pmf.needs.byStage.length > 1 && (
               <div className="mt-3 space-y-1 text-xs text-muted">
                 {pmf.needs.byStage.map((b) => (
@@ -298,7 +312,9 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
                 {pmf.needs.texts.map((t, i) => (
                   <div key={i} className="rounded-2xl bg-surface-2 px-3 py-2 text-xs">
                     <div className="text-muted">
-                      {shortDate(t.at)} · {t.stage} · главное: {pmf.needs.items.find((x) => x.key === t.first)?.label.toLowerCase() ?? t.first}
+                      {shortDate(t.at)} · {t.stage}
+                      {t.gender === 'm' ? ' · муж.' : t.gender === 'f' ? ' · жен.' : ''} · главное:{' '}
+                      {pmf.needs.items.find((x) => x.key === t.first)?.label.toLowerCase() ?? t.first}
                     </div>
                     <div className="mt-1">«{t.text}»</div>
                   </div>

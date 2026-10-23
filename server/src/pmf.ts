@@ -146,7 +146,8 @@ export interface PmfResponse {
     shown: number;
     items: Array<{ key: string; label: string; score: number; first: number; top3: number }>;
     byStage: Array<{ stage: string; responses: number; top: string[] }>;
-    texts: Array<{ at: string; stage: string; text: string; first: string }>;
+    byGender: Array<{ gender: 'm' | 'f'; responses: number; items: Array<{ key: string; label: string; score: number; first: number; top3: number }> }>;
+    texts: Array<{ at: string; stage: string; gender: string | null; text: string; first: string }>;
   };
   survey: {
     responses: number;
@@ -369,8 +370,9 @@ export function computePmf(periodDays: number): PmfResponse {
     .filter((s) => s.pairs > 0);
 
   // --- Чего хотят от отношений ---
-  const needRows = all<{ ranks: string; other: string | null; created_at: string; stage: string | null }>(
-    `SELECT n.ranks, n.other, n.created_at, p.stage FROM needs_responses n JOIN pairs p ON p.id = n.pair_id WHERE ${notExcluded('n.pair_id')} ORDER BY n.created_at DESC`,
+  const needRows = all<{ ranks: string; other: string | null; created_at: string; stage: string | null; gender: string | null }>(
+    `SELECT n.ranks, n.other, n.created_at, p.stage, u.gender FROM needs_responses n JOIN pairs p ON p.id = n.pair_id JOIN users u ON u.id = n.user_id
+      WHERE ${notExcluded('n.pair_id')} ORDER BY n.created_at DESC`,
   ).map((r) => ({ ...r, list: JSON.parse(r.ranks) as string[] }));
   const needsShown = Number(
     one<{ n: number }>(`SELECT COUNT(DISTINCT user_id) AS n FROM events WHERE type = 'needs_shown' AND ${notExcluded('pair_id')}`)?.n ?? 0,
@@ -403,10 +405,16 @@ export function computePmf(periodDays: number): PmfResponse {
         };
       })
       .filter((s) => s.responses > 0),
+    byGender: (['m', 'f'] as const)
+      .map((g) => {
+        const list = needRows.filter((r) => r.gender === g);
+        return { gender: g, responses: list.length, items: needItems(list) };
+      })
+      .filter((s) => s.responses > 0),
     texts: needRows
       .filter((r) => r.other)
       .slice(0, 40)
-      .map((r) => ({ at: r.created_at, stage: STAGE_LABEL[r.stage ?? 'none'], text: r.other!, first: r.list[0] })),
+      .map((r) => ({ at: r.created_at, stage: STAGE_LABEL[r.stage ?? 'none'], gender: r.gender, text: r.other!, first: r.list[0] })),
   };
 
   // --- Опрос ---
@@ -529,7 +537,7 @@ export async function registerPmfRoutes(app: FastifyInstance, deps: { keyOk: (k:
   /** «Чего вам хочется от отношений?»: три ключа по порядку важности и свой вариант. */
   app.post('/api/needs', { preHandler: requireUser }, async (req, reply) => {
     const user = req.user!;
-    const body = (req.body ?? {}) as { ranks?: unknown; other?: unknown };
+    const body = (req.body ?? {}) as { ranks?: unknown; other?: unknown; gender?: unknown };
     const keys = new Set<string>(NEEDS.map((n) => n.key));
     const ranks = Array.isArray(body.ranks) ? [...new Set(body.ranks.filter((k): k is string => typeof k === 'string' && keys.has(k)))] : [];
     if (ranks.length !== NEEDS_PICK) return reply.code(400).send({ error: 'ranks' });
@@ -543,6 +551,7 @@ export async function registerPmfRoutes(app: FastifyInstance, deps: { keyOk: (k:
       other,
       nowIso(),
     );
+    if (body.gender === 'm' || body.gender === 'f') run('UPDATE users SET gender = ? WHERE id = ?', body.gender, user.id);
     logEvent('needs_answered', { pairId: user.pair_id, userId: user.id, meta: { first: ranks[0] } });
     return deps.meResponse(one<UserRow>('SELECT * FROM users WHERE id = ?', user.id)!);
   });
