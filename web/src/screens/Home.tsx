@@ -11,6 +11,7 @@ import { StageCard } from '../components/StageCard';
 import { CareHintCard } from '../components/CareHintCard';
 import { PersonalQuestion } from '../components/PersonalQuestion';
 import { SurveyCard } from '../components/SurveyCard';
+import { NeedsCard } from '../components/NeedsCard';
 import { useStore } from '../lib/store';
 import { formatDate, matchPercent, nDays, nDiscoveries, relDay, todayLocal } from '../lib/format';
 import { Button, Card, Label, Spinner } from '../components/ui';
@@ -154,7 +155,7 @@ export function Home() {
         {partner && <NotificationPrompt />}
         {partner && <AccessNudge />}
         {partner && <RecommendNudge />}
-        {partner && <SurveyCard />}
+        {partner && (me.needsDue ? <NeedsCard /> : <SurveyCard />)}
         {partner && <CareHintCard />}
         {partner && <MemoryCardBox myName={myName} partnerName={partner.name} />}
 

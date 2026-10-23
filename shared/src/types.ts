@@ -216,6 +216,23 @@ export const LAYER_LABELS: Record<Layer, string> = { light: 'Лёгкий', us: 
  * «Плохой вопрос»: почему. Вопрос убирается у пары в любом случае;
  * причины с topic: true ещё и приглушают тему (три такие отметки — тема выключается).
  */
+/**
+ * Опрос «Чего вам хочется от отношений?»: человек выбирает три самых важных по порядку.
+ * Формулировки — от ощущения в отношениях, а не от функции приложения; порядок показа перемешивается.
+ */
+export const NEEDS = [
+  { key: 'understand', label: 'Лучше понимать друг друга' },
+  { key: 'discover', label: 'Узнавать друг о друге новое' },
+  { key: 'talk', label: 'Больше разговоров — не только о делах' },
+  { key: 'spark', label: 'Больше ярких впечатлений вместе' },
+  { key: 'warmth', label: 'Больше нежности и тепла каждый день' },
+  { key: 'time', label: 'Больше времени вдвоём' },
+  { key: 'peace', label: 'Меньше ссор, легче договариваться' },
+  { key: 'seen', label: 'Чувствовать, что меня ценят и замечают' },
+] as const;
+export type NeedKey = (typeof NEEDS)[number]['key'];
+export const NEEDS_PICK = 3;
+
 export const BAD_QUESTION_REASONS = [
   { key: 'options', label: 'Не подходит ни один вариант', topic: false },
   { key: 'both', label: 'Подходят оба варианта', topic: false },
@@ -340,6 +357,8 @@ export interface MeResponse {
   digestReady: { weekStart: string; title: string | null } | null;
   /** Пора показать короткий опрос о Половинке. */
   surveyDue: boolean;
+  /** Пора спросить, чего хочется от отношений. */
+  needsDue: boolean;
 }
 
 export interface AccessState {

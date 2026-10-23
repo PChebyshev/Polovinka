@@ -141,6 +141,8 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
     }
     const allowed = new Set([
       'survey_shown',
+      'needs_shown',
+      'needs_dismissed',
       'survey_dismissed',
       'install_prompt_shown',
       'install_accepted',

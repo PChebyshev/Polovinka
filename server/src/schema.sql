@@ -287,6 +287,15 @@ CREATE TABLE IF NOT EXISTS survey_responses (
   created_at TEXT NOT NULL
 );
 
+-- Опрос «Чего вам хочется от отношений?»: три выбора по порядку важности
+CREATE TABLE IF NOT EXISTS needs_responses (
+  user_id TEXT PRIMARY KEY,
+  pair_id TEXT NOT NULL,
+  ranks TEXT NOT NULL,
+  other TEXT,
+  created_at TEXT NOT NULL
+);
+
 -- Рекламные кампании: уникальная ссылка /a/<code> или utm-метки (utm_key = source|campaign|content)
 CREATE TABLE IF NOT EXISTS campaigns (
   id TEXT PRIMARY KEY,

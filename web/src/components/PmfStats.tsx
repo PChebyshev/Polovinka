@@ -253,6 +253,62 @@ export function PmfStats({ pmf, statsKey, periodDays, onChanged }: { pmf: PmfRes
         Product–market fit
       </Label>
 
+      <Section
+        title="Чего хотят от отношений"
+        hint="Три выбора по порядку важности: 3 балла за первое место, 2 — за второе, 1 — за третье. Показывается после первого открытия."
+      >
+        {pmf.needs.responses === 0 ? (
+          <p className="text-sm text-muted">Пока нет ответов{pmf.needs.shown ? ` (увидели ${pmf.needs.shown})` : ''}.</p>
+        ) : (
+          <>
+            <p className="mb-3 text-xs text-muted">
+              Ответов {pmf.needs.responses}
+              {pmf.needs.shown ? ` из ${pmf.needs.shown} увидевших` : ''}
+            </p>
+            <BarList rows={pmf.needs.items.map((i) => [i.label, i.score])} wide />
+            <table className="mt-3 w-full text-xs tabular-nums">
+              <thead>
+                <tr className="text-left text-muted">
+                  <th className="font-normal">Потребность</th>
+                  <th className="text-right font-normal">на 1-м месте</th>
+                  <th className="text-right font-normal">в тройке</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pmf.needs.items.map((i) => (
+                  <tr key={i.key} className="border-t border-line">
+                    <td className="py-1 pr-2">{i.label}</td>
+                    <td className="py-1 text-right">{pct(i.first / pmf.needs.responses)}</td>
+                    <td className="py-1 text-right">{pct(i.top3 / pmf.needs.responses)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {pmf.needs.byStage.length > 1 && (
+              <div className="mt-3 space-y-1 text-xs text-muted">
+                {pmf.needs.byStage.map((b) => (
+                  <div key={b.stage}>
+                    <span className="text-text">{b.stage}</span> ({b.responses}): {b.top.join(' · ') || '—'}
+                  </div>
+                ))}
+              </div>
+            )}
+            {pmf.needs.texts.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {pmf.needs.texts.map((t, i) => (
+                  <div key={i} className="rounded-2xl bg-surface-2 px-3 py-2 text-xs">
+                    <div className="text-muted">
+                      {shortDate(t.at)} · {t.stage} · главное: {pmf.needs.items.find((x) => x.key === t.first)?.label.toLowerCase() ?? t.first}
+                    </div>
+                    <div className="mt-1">«{t.text}»</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </Section>
+
       <Section title="Опрос: «Если бы Половинка исчезла…»" hint="Тест Шона Эллиса. Цель — 40% и больше отвечают «очень расстроюсь».">
         {s.responses === 0 ? (
           <p className="text-sm text-muted">Пока нет ответов. Опрос появляется у пары через 10 дней после присоединения партнёра и 7 открытий.</p>

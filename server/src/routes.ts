@@ -21,7 +21,7 @@ import { registerMemoryRoutes } from './memories.js';
 import { registerIdeaRoutes, ideasOpen, prefsFor, upcomingPlans } from './ideas.js';
 import { digestReadyFor, registerDigestRoutes, startDigests } from './digest.js';
 import { aiEnabled } from './ai.js';
-import { surveyDue, trackAppOpen } from './pmf.js';
+import { needsDue, surveyDue, trackAppOpen } from './pmf.js';
 import { campaignForSignup } from './campaigns.js';
 import { pushReveal, pushPartnerAnswered } from './push.js';
 import { guessHit } from './score.js';
@@ -94,6 +94,7 @@ function meResponse(user: UserRow): MeResponse {
     upcoming: upcomingPlans(pair.id),
     digestReady: digestReadyFor(user, pair),
     surveyDue: surveyDue(user),
+    needsDue: needsDue(user),
   };
 }
 

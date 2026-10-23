@@ -4,6 +4,7 @@ import { nowIso } from './ids.js';
 import { addDays, daysBetween } from './time.js';
 import { requireUser } from './auth.js';
 import { scoreFor } from './score.js';
+import { NEEDS, NEEDS_PICK } from '../../shared/src/types.js';
 
 /**
  * Продуктовая статистика: недельная активность, функции, удержание по когортам,
@@ -27,6 +28,16 @@ function namesOf(pairId: string): string[] {
 const SURVEY_MIN_DAYS = 10;
 const SURVEY_MIN_DISCOVERIES = 7;
 const DISAPPOINT = ['very', 'somewhat', 'not'] as const;
+
+const NEEDS_MIN_DAYS = 2;
+
+/** Пора спросить о потребностях: пара полная, есть хотя бы одно открытие или прошло 2 дня, ещё не отвечал. */
+export function needsDue(user: UserRow): boolean {
+  if (one('SELECT 1 FROM needs_responses WHERE user_id = ?', user.id)) return false;
+  const joined = one<{ n: number; at: string }>('SELECT COUNT(*) AS n, MAX(created_at) AS at FROM users WHERE pair_id = ?', user.pair_id);
+  if (Number(joined?.n ?? 0) < 2 || !joined?.at) return false;
+  return scoreFor(user.pair_id).discoveries >= 1 || Date.now() - new Date(joined.at).getTime() >= NEEDS_MIN_DAYS * 86_400_000;
+}
 
 /** Пора ли показать опрос: пара полная не меньше 10 дней, 7+ открытий, ещё не отвечал. */
 export function surveyDue(user: UserRow): boolean {
@@ -130,6 +141,13 @@ export interface PmfResponse {
   activation: Array<[string, number]>;
   access: Array<[string, number]>;
   stages: Array<{ stage: string; pairs: number; activeShare: number | null; avgDays: number | null }>;
+  needs: {
+    responses: number;
+    shown: number;
+    items: Array<{ key: string; label: string; score: number; first: number; top3: number }>;
+    byStage: Array<{ stage: string; responses: number; top: string[] }>;
+    texts: Array<{ at: string; stage: string; text: string; first: string }>;
+  };
   survey: {
     responses: number;
     shown: number;
@@ -350,6 +368,47 @@ export function computePmf(periodDays: number): PmfResponse {
     })
     .filter((s) => s.pairs > 0);
 
+  // --- Чего хотят от отношений ---
+  const needRows = all<{ ranks: string; other: string | null; created_at: string; stage: string | null }>(
+    `SELECT n.ranks, n.other, n.created_at, p.stage FROM needs_responses n JOIN pairs p ON p.id = n.pair_id WHERE ${notExcluded('n.pair_id')} ORDER BY n.created_at DESC`,
+  ).map((r) => ({ ...r, list: JSON.parse(r.ranks) as string[] }));
+  const needsShown = Number(
+    one<{ n: number }>(`SELECT COUNT(DISTINCT user_id) AS n FROM events WHERE type = 'needs_shown' AND ${notExcluded('pair_id')}`)?.n ?? 0,
+  );
+  const needItems = (rows: typeof needRows) =>
+    NEEDS.map((n) => {
+      const score = rows.reduce((s, r) => s + Math.max(0, NEEDS_PICK - r.list.indexOf(n.key)) * Number(r.list.includes(n.key)), 0);
+      return {
+        key: n.key,
+        label: n.label,
+        score,
+        first: rows.filter((r) => r.list[0] === n.key).length,
+        top3: rows.filter((r) => r.list.includes(n.key)).length,
+      };
+    }).sort((a, b) => b.score - a.score || b.first - a.first);
+  const needs = {
+    responses: needRows.length,
+    shown: needsShown,
+    items: needItems(needRows),
+    byStage: stageKeys
+      .map((s) => {
+        const list = needRows.filter((r) => (r.stage ?? 'none') === s);
+        return {
+          stage: STAGE_LABEL[s],
+          responses: list.length,
+          top: needItems(list)
+            .slice(0, 3)
+            .filter((i) => i.score > 0)
+            .map((i) => i.label),
+        };
+      })
+      .filter((s) => s.responses > 0),
+    texts: needRows
+      .filter((r) => r.other)
+      .slice(0, 40)
+      .map((r) => ({ at: r.created_at, stage: STAGE_LABEL[r.stage ?? 'none'], text: r.other!, first: r.list[0] })),
+  };
+
   // --- Опрос ---
   const resp = all<{ disappoint: string; benefit: string | null; missing: string | null; created_at: string; stage: string | null }>(
     `SELECT s.disappoint, s.benefit, s.missing, s.created_at, p.stage FROM survey_responses s JOIN pairs p ON p.id = s.pair_id WHERE ${notExcluded('s.pair_id')} ORDER BY s.created_at DESC`,
@@ -427,7 +486,7 @@ export function computePmf(periodDays: number): PmfResponse {
     ['Без почты, уже отвечали (видят экран почты)', Number(acc?.due ?? 0)],
   ];
 
-  return { excluded, week, weekly, features, cohorts, activation, stages, survey, pairs, access };
+  return { excluded, week, weekly, features, cohorts, activation, stages, survey, needs, pairs, access };
 }
 
 // --- Маршруты ---------------------------------------------------------------------------
@@ -465,6 +524,27 @@ export async function registerPmfRoutes(app: FastifyInstance, deps: { keyOk: (k:
     if (!deps.keyOk(keyOf(req))) return reply.code(401).send({ error: 'stats_key' });
     run('DELETE FROM stats_exclude WHERE pair_id = ?', (req.params as { pairId: string }).pairId);
     return { ok: true };
+  });
+
+  /** «Чего вам хочется от отношений?»: три ключа по порядку важности и свой вариант. */
+  app.post('/api/needs', { preHandler: requireUser }, async (req, reply) => {
+    const user = req.user!;
+    const body = (req.body ?? {}) as { ranks?: unknown; other?: unknown };
+    const keys = new Set<string>(NEEDS.map((n) => n.key));
+    const ranks = Array.isArray(body.ranks) ? [...new Set(body.ranks.filter((k): k is string => typeof k === 'string' && keys.has(k)))] : [];
+    if (ranks.length !== NEEDS_PICK) return reply.code(400).send({ error: 'ranks' });
+    const other = typeof body.other === 'string' && body.other.trim() ? body.other.replace(/\s+/g, ' ').trim().slice(0, 500) : null;
+    run(
+      `INSERT INTO needs_responses (user_id, pair_id, ranks, other, created_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET ranks = excluded.ranks, other = excluded.other, created_at = excluded.created_at`,
+      user.id,
+      user.pair_id,
+      JSON.stringify(ranks),
+      other,
+      nowIso(),
+    );
+    logEvent('needs_answered', { pairId: user.pair_id, userId: user.id, meta: { first: ranks[0] } });
+    return deps.meResponse(one<UserRow>('SELECT * FROM users WHERE id = ?', user.id)!);
   });
 
   app.post('/api/survey', { preHandler: requireUser }, async (req, reply) => {
