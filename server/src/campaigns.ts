@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { all, one, run, logEvent } from './db.js';
 import { newCode, newId, nowIso } from './ids.js';
 import { notExcluded } from './pmf.js';
+import { edgeHost, publicBase } from './hosts.js';
 
 /**
  * Рекламные кампании: уникальная ссылка /a/<код> и/или utm-метки из рекламного кабинета.
@@ -22,13 +23,6 @@ interface CampaignRow {
 }
 
 const ATTR_DAYS = 30;
-
-function publicBase(req: FastifyRequest): string {
-  const env = process.env.PUBLIC_URL?.replace(/\/$/, '');
-  if (env) return env;
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0] ?? req.protocol;
-  return `${proto}://${req.headers.host}`;
-}
 
 const clean = (v: unknown, max = 60) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '');
 
@@ -82,11 +76,15 @@ export interface CampaignStats {
   name: string;
   source: string | null;
   url: string;
+  /** Та же ссылка через зарубежный вход — для Telegram (работает с VPN). */
+  edgeUrl: string | null;
   budget: number | null;
   auto: boolean;
   archived: boolean;
   createdAt: string;
   visits: number;
+  /** Из них пришли через зарубежный вход (с VPN). */
+  edgeVisits: number;
   installs: number;
   signups: number;
   pairs: number;
@@ -97,6 +95,12 @@ export interface CampaignStats {
   surveyVery: number;
   surveyResponses: number;
 }
+
+/** Первый домен из EDGE_HOSTS — им подписываем рекламные ссылки для Telegram. */
+const edgeBase = () => {
+  const h = (process.env.EDGE_HOSTS ?? '').split(',')[0]?.trim();
+  return h ? `https://${h}` : null;
+};
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -139,7 +143,10 @@ function pairMetrics(pairIds: string[]) {
 export function computeCampaigns(
   base: string,
   periodDays: number,
-): { campaigns: CampaignStats[]; organic: Omit<CampaignStats, 'id' | 'code' | 'url' | 'budget' | 'auto' | 'archived' | 'createdAt' | 'source' | 'name'> } {
+): {
+  campaigns: CampaignStats[];
+  organic: Omit<CampaignStats, 'id' | 'code' | 'url' | 'edgeUrl' | 'budget' | 'auto' | 'archived' | 'createdAt' | 'source' | 'name'>;
+} {
   const rows = all<CampaignRow>('SELECT * FROM campaigns ORDER BY archived_at IS NOT NULL, created_at DESC');
   const visitors = (cid: string, standalone: 0 | 1) =>
     Number(
@@ -157,11 +164,18 @@ export function computeCampaigns(
       name: c.name,
       source: c.source,
       url: `${base}/a/${c.code}`,
+      edgeUrl: edgeBase() ? `${edgeBase()}/a/${c.code}` : null,
       budget: c.budget,
       auto: !!c.utm_key,
       archived: !!c.archived_at,
       createdAt: c.created_at,
       visits: visitors(c.id, 0),
+      edgeVisits: Number(
+        one<{ n: number }>(
+          `SELECT COUNT(DISTINCT json_extract(meta, '$.visitor')) AS n FROM events WHERE type = 'ad_visit' AND json_extract(meta, '$.campaign') = ? AND json_extract(meta, '$.edge') = 1`,
+          c.id,
+        )?.n ?? 0,
+      ),
       installs: visitors(c.id, 1),
       signups: pairIds.length,
       ...pairMetrics(pairIds),
@@ -173,7 +187,7 @@ export function computeCampaigns(
     `SELECT id FROM pairs WHERE campaign_id IS NULL AND is_guest = 0 AND created_at >= ? AND ${notExcluded('id')}`,
     since,
   ).map((r) => r.id);
-  return { campaigns, organic: { visits: 0, installs: 0, signups: organicIds.length, ...pairMetrics(organicIds) } };
+  return { campaigns, organic: { visits: 0, edgeVisits: 0, installs: 0, signups: organicIds.length, ...pairMetrics(organicIds) } };
 }
 
 export async function registerCampaignRoutes(app: FastifyInstance, deps: { keyOk: (k: unknown) => boolean }) {
@@ -185,7 +199,7 @@ export async function registerCampaignRoutes(app: FastifyInstance, deps: { keyOk
     const visitor = typeof body.visitor === 'string' && /^[a-z0-9]{8,32}$/.test(body.visitor) ? body.visitor : null;
     const c = byCode(body.code) ?? byUtm(body.utm);
     if (!c || !visitor || c.archived_at) return { code: c && !c.archived_at ? c.code : null };
-    logEvent('ad_visit', { meta: { campaign: c.id, visitor, standalone: body.standalone ? 1 : 0 } });
+    logEvent('ad_visit', { meta: { campaign: c.id, visitor, standalone: body.standalone ? 1 : 0, edge: edgeHost(req) ? 1 : 0 } });
     return { code: c.code };
   });
 

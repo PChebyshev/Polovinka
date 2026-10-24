@@ -15,6 +15,7 @@ function plural(n: number, one: string, few: string, many: string): string {
 import { registerRoutes } from './routes.js';
 import { initPush, startScheduler } from './push.js';
 import { initMail } from './mail.js';
+import { publicBase } from './hosts.js';
 import { startBackups } from './backup.js';
 import { refPair, refPreview } from './recommend.js';
 
@@ -22,11 +23,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? '0.0.0.0';
 const DATA_DIR = resolve(process.env.DATA_DIR ?? join(here, '..', '..', 'data'));
-const WEB_DIST = [
-  process.env.WEB_DIST,
-  join(here, '..', '..', 'web', 'dist'),
-  join(here, '..', '..', '..', '..', 'web', 'dist'),
-].filter((p): p is string => !!p).find((p) => existsSync(join(p, 'index.html')));
+const WEB_DIST = [process.env.WEB_DIST, join(here, '..', '..', 'web', 'dist'), join(here, '..', '..', '..', '..', 'web', 'dist')]
+  .filter((p): p is string => !!p)
+  .find((p) => existsSync(join(p, 'index.html')));
 
 openDb(DATA_DIR);
 
@@ -97,7 +96,7 @@ function ogFor(path: string, base: string): Og {
     const ch = one<{ from_pair_id: string }>('SELECT from_pair_id FROM challenges WHERE code = ?', c[1]);
     if (ch) {
       const names = all<UserRow>('SELECT * FROM users WHERE pair_id = ? ORDER BY created_at', ch.from_pair_id).map((u) => u.name);
-      const title = names.length > 1 ? `${names[0]} и ${names[1]}` : names[0] ?? 'Пара';
+      const title = names.length > 1 ? `${names[0]} и ${names[1]}` : (names[0] ?? 'Пара');
       return {
         title: `${title} бросают вам вызов: 5 вопросов`,
         description: 'Пройдите те же вопросы со своей половинкой, а потом сравним, где совпали. Без победителей.',
@@ -111,7 +110,7 @@ function ogFor(path: string, base: string): Og {
     if (card) {
       const names = all<UserRow>('SELECT * FROM users WHERE pair_id = ? ORDER BY created_at', card.pair_id).map((u) => u.name);
       const st = JSON.parse(card.stats) as { discoveries: number; matchPercent: number | null };
-      const title = names.length > 1 ? `${names[0]} и ${names[1]}` : names[0] ?? 'Пара';
+      const title = names.length > 1 ? `${names[0]} и ${names[1]}` : (names[0] ?? 'Пара');
       const pct = st.matchPercent === null ? '' : `, знают друг друга на ${st.matchPercent}%`;
       return {
         title: `${title}: ${st.discoveries} ${plural(st.discoveries, 'открытие', 'открытия', 'открытий')} за неделю${pct}`,
@@ -162,9 +161,7 @@ if (WEB_DIST) {
 
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'not_found' });
-    const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? req.protocol;
-    const host = (req.headers['x-forwarded-host'] as string | undefined) ?? req.headers.host ?? 'localhost';
-    const base = process.env.PUBLIC_URL?.replace(/\/$/, '') ?? `${proto}://${host}`;
+    const base = publicBase(req);
     const og = ogFor(req.url.split('?')[0], base);
     const tags = [
       `<meta property="og:type" content="website">`,

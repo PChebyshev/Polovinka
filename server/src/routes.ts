@@ -5,6 +5,7 @@ import { GESTURE_LABELS } from '../../shared/src/types.js';
 import { all, one, run, transaction, logEvent, type AnswerRow, type GestureRow, type PairRow, type RoundRow, type UserRow } from './db.js';
 import { hashToken, newCode, newId, newToken, nowIso } from './ids.js';
 import { requireUser, userByToken, readToken } from './auth.js';
+import { publicBase } from './hosts.js';
 import { dateInTz, isValidTz } from './time.js';
 import { pickQuestion, ensureDaily, markQuestion, parseReasons } from './selection.js';
 import { counters, gesturePublic, pairPublic, partnerOf, roundPublic, userPublic } from './serialize.js';
@@ -47,14 +48,6 @@ function cleanText(raw: unknown, max = TEXT_MAX): string | null {
 
 function pairOf(user: UserRow): PairRow {
   return one<PairRow>('SELECT * FROM pairs WHERE id = ?', user.pair_id)!;
-}
-
-function publicBase(req: { headers: Record<string, string | string[] | undefined>; protocol: string }): string {
-  const env = process.env.PUBLIC_URL;
-  if (env) return env.replace(/\/$/, '');
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? req.protocol;
-  const host = (req.headers['x-forwarded-host'] as string | undefined) ?? (req.headers.host as string | undefined) ?? 'localhost';
-  return `${proto}://${host}`;
 }
 
 function createSoloPair(tz: string, guest = false): PairRow {

@@ -1,0 +1,26 @@
+# Зарубежный вход: только пересылает запросы на основной сервер, ничего не хранит.
+# Люди с VPN (туннель за границу) не достукиваются до российского сервера напрямую,
+# а до этого сервера — да; отсюда до Москвы трафик идёт из дата-центра и проходит.
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$EDGE_DOMAIN} {
+	log {
+		output stdout
+		format console
+	}
+	encode zstd gzip
+	reverse_proxy https://{$ORIGIN} {
+		header_up Host {$ORIGIN}
+		# Основной сервер строит ссылки (приглашения, карточки) с этим доменом
+		header_up X-Polovinka-Host {host}
+		# SSE: отдавать события сразу, не буферизуя
+		flush_interval -1
+		transport http {
+			tls_server_name {$ORIGIN}
+		}
+	}
+}

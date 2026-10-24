@@ -2,19 +2,13 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { all, one, run, logEvent, type PairRow, type UserRow } from './db.js';
 import { newCode } from './ids.js';
 import { readToken, requireUser, userByToken } from './auth.js';
+import { publicBase } from './hosts.js';
 import { counters } from './serialize.js';
 
 /**
  * «Посоветовать друзьям»: у пары есть своя ссылка /f/<код>. Это не приглашение в пару —
  * по ней друзья открывают страницу «Стас и Ира советуют Половинку» и начинают свою пару.
  */
-
-function publicBase(req: FastifyRequest): string {
-  const env = process.env.PUBLIC_URL?.replace(/\/$/, '');
-  if (env) return env;
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined)?.split(',')[0] ?? req.protocol;
-  return `${proto}://${req.headers.host}`;
-}
 
 export function ensureRefCode(pairId: string): string {
   const row = one<{ ref_code: string | null }>('SELECT ref_code FROM pairs WHERE id = ?', pairId);

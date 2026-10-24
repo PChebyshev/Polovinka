@@ -410,11 +410,13 @@ export interface CampaignStats {
   name: string;
   source: string | null;
   url: string;
+  edgeUrl: string | null;
   budget: number | null;
   auto: boolean;
   archived: boolean;
   createdAt: string;
   visits: number;
+  edgeVisits: number;
   installs: number;
   signups: number;
   pairs: number;
@@ -447,7 +449,7 @@ export interface StatsResponse {
     top: Array<{ id: string; text: string; category: string; marks: number; pairs: number; reasons: Record<string, number>; comments: string[] }>;
   };
   backup: { enabled: boolean; lastAt: string | null; lastKey: string | null; lastSize: number | null; error: string | null; errorAt: string | null };
-  ads: { campaigns: CampaignStats[]; organic: Omit<CampaignStats, 'id' | 'code' | 'url' | 'budget' | 'auto' | 'archived' | 'createdAt' | 'source' | 'name'> };
+  ads: { campaigns: CampaignStats[]; organic: Omit<CampaignStats, 'id' | 'code' | 'url' | 'edgeUrl' | 'budget' | 'auto' | 'archived' | 'createdAt' | 'source' | 'name'> };
   generatedAt: string;
   periodDays: number;
   totals: { users: number; pairsComplete: number; pairsGuest: number; pairsSolo: number; pushSubscribed: number };

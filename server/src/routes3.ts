@@ -1,10 +1,20 @@
 import type { FastifyInstance } from 'fastify';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ChallengeCompare, ChallengeInfo, ChallengeQuestionCompare, MeResponse, MyChallenge, WeekPublic, WeekResponse, WeekStats } from '../../shared/src/types.js';
+import type {
+  ChallengeCompare,
+  ChallengeInfo,
+  ChallengeQuestionCompare,
+  MeResponse,
+  MyChallenge,
+  WeekPublic,
+  WeekResponse,
+  WeekStats,
+} from '../../shared/src/types.js';
 import { all, one, run, transaction, logEvent, type AnswerRow, type PairRow, type QuestionRow, type RoundRow, type UserRow } from './db.js';
 import { newCode, newId, nowIso } from './ids.js';
 import { requireUser, userByToken, readToken } from './auth.js';
+import { publicBase } from './hosts.js';
 import { addDays, dateInTz, weekdayInTz } from './time.js';
 import { pickQuestion } from './selection.js';
 import { partnerOf, roundPublic } from './serialize.js';
@@ -187,7 +197,14 @@ export function myChallenges(user: UserRow): MyChallenge[] {
     const qids = JSON.parse(ch.question_ids) as string[];
     const answered = qids.filter((q) => pairChoices(user.pair_id, q) !== null).length;
     const other = otherPairOf(ch, user.pair_id);
-    out.push({ code: ch.code, isSender: ch.from_pair_id === user.pair_id, fromNames: pairNames(ch.from_pair_id), answered, total: qids.length, otherJoined: !!other });
+    out.push({
+      code: ch.code,
+      isSender: ch.from_pair_id === user.pair_id,
+      fromNames: pairNames(ch.from_pair_id),
+      answered,
+      total: qids.length,
+      otherJoined: !!other,
+    });
   }
   return out;
 }
@@ -216,12 +233,26 @@ export async function registerStage3Routes(app: FastifyInstance, deps: Deps) {
     const stats = weekStats(pair.id, start, end);
     let row = one<{ code: string; png_path: string | null }>('SELECT code, png_path FROM weekly_cards WHERE pair_id = ? AND week_start = ?', pair.id, start);
     if (!row) {
-      run('INSERT INTO weekly_cards (id, code, pair_id, week_start, stats, created_at) VALUES (?, ?, ?, ?, ?, ?)', newId(), newCode(), pair.id, start, JSON.stringify(stats), nowIso());
+      run(
+        'INSERT INTO weekly_cards (id, code, pair_id, week_start, stats, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        newId(),
+        newCode(),
+        pair.id,
+        start,
+        JSON.stringify(stats),
+        nowIso(),
+      );
       row = one<{ code: string; png_path: string | null }>('SELECT code, png_path FROM weekly_cards WHERE pair_id = ? AND week_start = ?', pair.id, start)!;
     } else {
       run('UPDATE weekly_cards SET stats = ? WHERE pair_id = ? AND week_start = ?', JSON.stringify(stats), pair.id, start);
     }
-    const res: WeekResponse = { code: row.code, names: pairNames(pair.id), stats, isCurrent: offset === 0, hasImage: !!row.png_path && existsSync(row.png_path) };
+    const res: WeekResponse = {
+      code: row.code,
+      names: pairNames(pair.id),
+      stats,
+      isCurrent: offset === 0,
+      hasImage: !!row.png_path && existsSync(row.png_path),
+    };
     return res;
   });
 
@@ -252,7 +283,10 @@ export async function registerStage3Routes(app: FastifyInstance, deps: Deps) {
 
   /** Публичная карточка недели: только цифры, без ответов. */
   app.get('/api/week/public/:code', async (req, reply) => {
-    const row = one<{ pair_id: string; stats: string; png_path: string | null }>('SELECT pair_id, stats, png_path FROM weekly_cards WHERE code = ?', (req.params as { code: string }).code);
+    const row = one<{ pair_id: string; stats: string; png_path: string | null }>(
+      'SELECT pair_id, stats, png_path FROM weekly_cards WHERE code = ?',
+      (req.params as { code: string }).code,
+    );
     if (!row) return reply.code(404).send({ error: 'not_found' });
     logEvent('weekly_opened', { pairId: row.pair_id });
     const res: WeekPublic = { names: pairNames(row.pair_id), stats: JSON.parse(row.stats) as WeekStats, hasImage: !!row.png_path && existsSync(row.png_path) };
@@ -294,8 +328,20 @@ export async function registerStage3Routes(app: FastifyInstance, deps: Deps) {
     const id = newId();
     const code = newCode();
     transaction(() => {
-      run('INSERT INTO challenges (id, code, from_pair_id, question_ids, created_at) VALUES (?, ?, ?, ?, ?)', id, code, pair.id, JSON.stringify(qids), nowIso());
-      ensureChallengeRounds(pair.id, id, qids.filter((q) => !revealed.includes(q)), pair.tz);
+      run(
+        'INSERT INTO challenges (id, code, from_pair_id, question_ids, created_at) VALUES (?, ?, ?, ?, ?)',
+        id,
+        code,
+        pair.id,
+        JSON.stringify(qids),
+        nowIso(),
+      );
+      ensureChallengeRounds(
+        pair.id,
+        id,
+        qids.filter((q) => !revealed.includes(q)),
+        pair.tz,
+      );
     });
     logEvent('challenge_sent', { pairId: pair.id, userId: user.id, meta: { code } });
     const base = publicBase(req);
@@ -364,12 +410,4 @@ export async function registerStage3Routes(app: FastifyInstance, deps: Deps) {
     }
     return deps.meResponse(one<UserRow>('SELECT * FROM users WHERE id = ?', user.id)!);
   });
-}
-
-function publicBase(req: { headers: Record<string, string | string[] | undefined>; protocol: string }): string {
-  const env = process.env.PUBLIC_URL;
-  if (env) return env.replace(/\/$/, '');
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? req.protocol;
-  const host = (req.headers['x-forwarded-host'] as string | undefined) ?? (req.headers.host as string | undefined) ?? 'localhost';
-  return `${proto}://${host}`;
 }

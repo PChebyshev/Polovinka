@@ -199,6 +199,31 @@ docker run --rm -v polovinka_app-data:/data -v /root:/backup alpine \
 Архив появится в `/root`. Скачать на компьютер:
 `scp root@IP:/root/polovinka-*.tgz .`
 
+## Зарубежный вход для людей с VPN
+
+VPN с выходом за границу (AdGuard VPN и подобные) не доносит трафик до российского
+сервера: на входе в Россию его режут для известных VPN-сетей. При этом из обычного
+зарубежного дата-центра сервер доступен. Поэтому ставим второй маленький сервер за
+границей (Timeweb: Казахстан, Нидерланды, Польша — оплата в рублях), который только
+пересылает запросы в Москву. Данные остаются на основном сервере.
+
+1. Создайте сервер (минимальный тариф, Ubuntu). В DNS домена добавьте A-запись
+   `go` → IP нового сервера (получится `go.polovinka.online`).
+2. На новом сервере:
+   ```
+   curl -fsSL https://raw.githubusercontent.com/PChebyshev/Polovinka/claude/plan-and-data-model/deploy/edge-install.sh | EDGE_DOMAIN=go.polovinka.online bash
+   ```
+3. На основном сервере допишите в `/opt/polovinka/.env` строку `EDGE_HOSTS=go.polovinka.online`
+   и запустите `bash /opt/polovinka/deploy/install.sh`. После этого ссылки-приглашения,
+   карточки и OG у людей, пришедших через вход, строятся с доменом входа.
+4. Проверка: `https://go.polovinka.online/api/health` → `{"ok":true}`.
+
+В рекламе для Telegram давайте ссылки на `go.polovinka.online` — в `/stats` → «Реклама»
+у каждой кампании видно, сколько переходов пришло через вход (это и есть люди с VPN).
+Обычные пользователи продолжают пользоваться `polovinka.online`. Вход и основной сайт —
+разные адреса, поэтому вход на одном не действует на другом: это нормально, человек
+живёт там, где установил приложение.
+
 ## Переменные в `/opt/polovinka/.env`
 
 | Переменная | Назначение |
@@ -209,6 +234,7 @@ docker run --rm -v polovinka_app-data:/data -v /root:/backup alpine \
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | необязательно; задайте при переезде на другой сервер, чтобы не потерять push-подписки |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | включают привязку почты и вход по коду из письма |
 | `BACKUP_S3_BUCKET`, `BACKUP_S3_KEY_ID`, `BACKUP_S3_SECRET`, `BACKUP_PASSWORD` | ежедневная зашифрованная копия базы в хранилище; `BACKUP_S3_ENDPOINT`, `BACKUP_S3_REGION` — если не Яндекс |
+| `EDGE_HOSTS` | домены зарубежных входов через запятую (см. раздел выше) |
 | `EMAIL_REQUIRED` | `1` (по умолчанию) — просить почту после первого ответа; `0` — не просить |
 | `DATA_LOCATION`, `OPERATOR_NAME`, `PRIVACY_CONTACT` | необязательно; показываются на странице «Что мы храним», см. `docs/LEGAL.md` |
 | `CROWD_MIN` | с какого числа ответов показывать «Как ответили другие пары», по умолчанию 20 |

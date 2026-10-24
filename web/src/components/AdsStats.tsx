@@ -33,14 +33,14 @@ function Steps({ rows }: { rows: Array<[string, number, number | null]> }) {
 }
 
 function CampaignCard({ c, statsKey, onChanged }: { c: CampaignStats; statsKey: string; onChanged: () => void }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'main' | 'edge' | false>(false);
   const [editBudget, setEditBudget] = useState(false);
   const [budget, setBudget] = useState(c.budget ? String(c.budget) : '');
   const [busy, setBusy] = useState(false);
-  const copy = async () => {
+  const copy = async (which: 'main' | 'edge' = 'main') => {
     try {
-      await navigator.clipboard.writeText(c.url);
-      setCopied(true);
+      await navigator.clipboard.writeText(which === 'edge' && c.edgeUrl ? c.edgeUrl : c.url);
+      setCopied(which);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       /* скопируют руками */
@@ -75,10 +75,21 @@ function CampaignCard({ c, statsKey, onChanged }: { c: CampaignStats; statsKey: 
       </div>
       <div className="mt-2 flex items-center gap-2 rounded-xl bg-bg/50 px-3 py-2 text-xs">
         <span className="min-w-0 flex-1 truncate">{c.url}</span>
-        <button className="shrink-0 text-accent" onClick={copy}>
-          {copied ? 'скопировано' : 'скопировать'}
+        <button className="shrink-0 text-accent" onClick={() => copy('main')}>
+          {copied === 'main' ? 'скопировано' : 'скопировать'}
         </button>
       </div>
+      {c.edgeUrl && (
+        <div className="mt-1 flex items-center gap-2 rounded-xl bg-bg/50 px-3 py-2 text-xs">
+          <span className="min-w-0 flex-1 truncate">
+            <span className="text-muted">для Telegram (с VPN): </span>
+            {c.edgeUrl}
+          </span>
+          <button className="shrink-0 text-accent" onClick={() => copy('edge')}>
+            {copied === 'edge' ? 'скопировано' : 'скопировать'}
+          </button>
+        </div>
+      )}
 
       <div className="mt-3">
         {top === 0 ? (
@@ -87,6 +98,7 @@ function CampaignCard({ c, statsKey, onChanged }: { c: CampaignStats; statsKey: 
           <Steps
             rows={[
               ['Перешли по ссылке', c.visits, null],
+              ...(c.edgeVisits ? [['  из них с VPN (через зарубежный вход)', c.edgeVisits, c.visits || null] as [string, number, number | null]] : []),
               ['Установили на экран', c.installs, c.visits || null],
               ['Зарегистрировались', c.signups, c.visits || null],
               ['Партнёр присоединился', c.pairs, c.signups || null],
@@ -172,7 +184,9 @@ export function AdsStats({ ads, statsKey, periodDays, onChanged }: { ads: StatsR
 
   return (
     <div>
-      <Label className="mt-8 scroll-mt-4" id="ads">Реклама</Label>
+      <Label className="mt-8 scroll-mt-4" id="ads">
+        Реклама
+      </Label>
       <Card className="mt-2">
         <div className="text-sm font-semibold">Новая ссылка для объявления</div>
         <p className="mt-1 text-xs text-muted">Для каждого объявления или креатива — своя ссылка: так видно, какое работает лучше.</p>
