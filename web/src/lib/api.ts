@@ -1,7 +1,19 @@
 import { enqueue } from './queue';
 import { storedAttr } from './attr';
 import type { BookResponse, CapsulePublic, CareHint, DigestResponse, Idea, MemoryCard, PairStage, RoundIdea, TopicProgress } from '@polovinka/shared';
-import type { ChallengeCompare, ChallengeInfo, CustomQuestion, GesturePublic, GestureTemplate, HistoryResponse, MeResponse, RoundPublic, TodayResponse, WeekPublic, WeekResponse } from '@polovinka/shared';
+import type {
+  ChallengeCompare,
+  ChallengeInfo,
+  CustomQuestion,
+  GesturePublic,
+  GestureTemplate,
+  HistoryResponse,
+  MeResponse,
+  RoundPublic,
+  TodayResponse,
+  WeekPublic,
+  WeekResponse,
+} from '@polovinka/shared';
 
 const TOKEN_KEY = 'polovinka.token';
 
@@ -13,17 +25,47 @@ export function getToken(): string | null {
   }
 }
 
+const SNAPSHOT_KEY = 'polovinka.snapshot';
+const SNAPSHOT_MAX_AGE = 7 * 86_400_000;
+
+/** Последнее состояние (me + today) — чтобы приложение открывалось сразу, не дожидаясь сети. */
+export function readSnapshot(): { me: MeResponse; today: TodayResponse | null } | null {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as { token: string; at: number; me: MeResponse; today: TodayResponse | null };
+    if (s.token !== getToken() || Date.now() - s.at > SNAPSHOT_MAX_AGE) return null;
+    return { me: s.me, today: s.today };
+  } catch {
+    return null;
+  }
+}
+
+export function writeSnapshot(me: MeResponse, today: TodayResponse | null) {
+  try {
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify({ token: getToken(), at: Date.now(), me, today }));
+  } catch {
+    /* переполнено или приватный режим */
+  }
+}
+
 export function setToken(token: string | null) {
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
+    else {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(SNAPSHOT_KEY);
+    }
   } catch {
     /* приватный режим */
   }
 }
 
 export class ApiError extends Error {
-  constructor(public status: number, public code: string) {
+  constructor(
+    public status: number,
+    public code: string,
+  ) {
     super(code);
   }
 }
@@ -39,14 +81,35 @@ export class QueuedError extends Error {
 export let lastFromCache = false;
 
 async function request<T>(method: string, path: string, body?: unknown, opts: { queue?: boolean } = {}): Promise<T> {
+  return (await requestMeta<T>(method, path, body, opts)).data;
+}
+
+declare global {
+  interface Window {
+    /** index.html начинает грузить /api/me, пока едет скрипт приложения. */
+    __polovinkaMe?: Promise<Response>;
+  }
+}
+
+async function requestMeta<T>(method: string, path: string, body?: unknown, opts: { queue?: boolean } = {}): Promise<{ data: T; fromCache: boolean }> {
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.authorization = `Bearer ${token}`;
   if (body !== undefined) headers['content-type'] = 'application/json';
   let res: Response;
   try {
+    // /api/me мог начать грузиться ещё из index.html — берём тот ответ, если он есть
+    const early = method === 'GET' && path === '/api/me' ? window.__polovinkaMe : undefined;
+    if (early) window.__polovinkaMe = undefined;
     // Не ждать вечно: через VPN или на слабой сети лучше ошибка (и очередь для ответов), чем бесконечный спиннер
-    res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(method === 'GET' ? 25_000 : 20_000) });
+    res =
+      (await early?.catch(() => undefined)) ??
+      (await fetch(path, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(method === 'GET' ? 25_000 : 20_000),
+      }));
   } catch (e) {
     if (opts.queue && body !== undefined) {
       await enqueue({ method: method as 'POST', path, body: JSON.stringify(body) });
@@ -55,7 +118,8 @@ async function request<T>(method: string, path: string, body?: unknown, opts: { 
     }
     throw e;
   }
-  lastFromCache = res.headers.get('x-sw-cache') === '1';
+  const fromCache = res.headers.get('x-sw-cache') === '1';
+  lastFromCache = fromCache;
   if (!res.ok) {
     let code = `http_${res.status}`;
     try {
@@ -66,7 +130,19 @@ async function request<T>(method: string, path: string, body?: unknown, opts: { 
     }
     throw new ApiError(res.status, code);
   }
-  return (await res.json()) as T;
+  return { data: (await res.json()) as T, fromCache };
+}
+
+/** me и today одним махом, параллельно: на медленной сети это вдвое быстрее, чем по очереди. */
+export async function loadState(): Promise<{ me: MeResponse; meCached: boolean; today: TodayResponse | null; todayCached: boolean; todayError: unknown }> {
+  const [m, t] = await Promise.all([
+    requestMeta<MeResponse>('GET', '/api/me'),
+    requestMeta<TodayResponse>('GET', '/api/today').then(
+      (r) => ({ ok: true as const, r }),
+      (e: unknown) => ({ ok: false as const, e }),
+    ),
+  ]);
+  return { me: m.data, meCached: m.fromCache, today: t.ok ? t.r.data : null, todayCached: t.ok ? t.r.fromCache : false, todayError: t.ok ? null : t.e };
 }
 
 export function deviceTz(): string {
@@ -91,9 +167,11 @@ export const api = {
     request<{ ok: true }>('PUT', `/api/campaigns/${id}?key=${encodeURIComponent(key)}`, body),
   recommend: () => request<{ code: string; url: string; host: string; image: string; title: string; description: string }>('GET', '/api/recommend'),
   recommendSent: (via: string, variant: string) => request<{ ok: true }>('POST', '/api/recommend/sent', { via, variant }),
-  recommendInfo: (code: string, peek = false) => request<{ names: string[]; days: number }>('GET', `/api/recommend/${encodeURIComponent(code)}${peek ? '?peek=1' : ''}`),
+  recommendInfo: (code: string, peek = false) =>
+    request<{ names: string[]; days: number }>('GET', `/api/recommend/${encodeURIComponent(code)}${peek ? '?peek=1' : ''}`),
   me: () => request<MeResponse>('GET', '/api/me'),
-  updateMe: (patch: { name?: string; notifMorning?: string; notifEvening?: string; notifEnabled?: boolean; tz?: string }) => request<MeResponse>('PUT', '/api/me', patch),
+  updateMe: (patch: { name?: string; notifMorning?: string; notifEvening?: string; notifEnabled?: boolean; tz?: string }) =>
+    request<MeResponse>('PUT', '/api/me', patch),
   invite: () => request<{ code: string; url: string; text: string }>('GET', '/api/invite'),
   inviteSent: (via: string) => request<{ ok: true }>('POST', '/api/invite/sent', { via }),
   inviteInfo: (code: string, peek = false) =>
@@ -106,7 +184,8 @@ export const api = {
   why: (roundId: string, data: { whyText?: string; whyChip?: string }) => request<RoundPublic>('POST', `/api/rounds/${roundId}/why`, data, { queue: true }),
   topicOpened: (roundId: string) => request<{ ok: true }>('POST', `/api/rounds/${roundId}/topic-opened`),
   bonus: () => request<RoundPublic>('POST', '/api/rounds/bonus'),
-  mark: (questionId: string, reasons: string[] = [], comment?: string) => request<{ ok: true }>('POST', `/api/questions/${questionId}/mark`, { reasons, comment }),
+  mark: (questionId: string, reasons: string[] = [], comment?: string) =>
+    request<{ ok: true }>('POST', `/api/questions/${questionId}/mark`, { reasons, comment }),
   nudge: () => request<{ text: string; url: string; firstToday: boolean }>('POST', '/api/nudge'),
   sendGesture: (type: string, text: string, cid: string) => request<GesturePublic>('POST', '/api/gestures', { type, text, clientId: cid }, { queue: true }),
   gestures: () => request<{ gestures: GesturePublic[] }>('GET', '/api/gestures'),
@@ -114,7 +193,10 @@ export const api = {
   deleteHistory: () => request<{ ok: true }>('DELETE', '/api/pair/history'),
   // Этап 2
   history: (before?: string | null, favorites = false, only?: 'rounds' | 'gestures') =>
-    request<HistoryResponse>('GET', `/api/history?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}${favorites ? '&favorites=1' : ''}${only ? `&only=${only}` : ''}`),
+    request<HistoryResponse>(
+      'GET',
+      `/api/history?limit=30${before ? `&before=${encodeURIComponent(before)}` : ''}${favorites ? '&favorites=1' : ''}${only ? `&only=${only}` : ''}`,
+    ),
   toggleFavorite: (kind: 'round' | 'gesture', refId: string) => request<{ favorite: boolean }>('POST', '/api/favorites/toggle', { kind, refId }),
   milestoneSeen: (key: string) => request<{ ok: true }>('POST', `/api/milestones/${encodeURIComponent(key)}/seen`),
   skipRound: (roundId: string, reasons: string[], comment?: string) =>
@@ -133,7 +215,11 @@ export const api = {
   weekShared: (via: string) => request<{ ok: true }>('POST', `/api/week/x/shared`, { via }),
   uploadWeekImage: async (code: string, blob: Blob) => {
     const token = getToken();
-    const res = await fetch(`/api/week/${code}/image`, { method: 'POST', headers: { 'content-type': 'image/png', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: blob });
+    const res = await fetch(`/api/week/${code}/image`, {
+      method: 'POST',
+      headers: { 'content-type': 'image/png', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: blob,
+    });
     if (!res.ok) throw new ApiError(res.status, 'upload');
   },
   createChallenge: () => request<{ code: string; url: string; text: string; compare: ChallengeCompare }>('POST', '/api/challenges'),
@@ -166,7 +252,8 @@ export const api = {
   setPrefs: (patch: { intimacy?: boolean; careHints?: boolean }) => request<MeResponse>('PUT', '/api/me/prefs', patch),
   roundIdeas: (roundId: string) => request<{ ideas: RoundIdea[]; source: string; saved: boolean[] }>('GET', `/api/rounds/${roundId}/ideas`),
   ideas: () => request<{ ideas: Idea[] }>('GET', '/api/ideas'),
-  addIdea: (text: string, kind: 'do' | 'talk' = 'do', roundId?: string, date?: string | null) => request<Idea>('POST', '/api/ideas', { text, kind, roundId, date: date ?? undefined }),
+  addIdea: (text: string, kind: 'do' | 'talk' = 'do', roundId?: string, date?: string | null) =>
+    request<Idea>('POST', '/api/ideas', { text, kind, roundId, date: date ?? undefined }),
   planIdea: (id: string, date: string | null, time?: string | null) => request<Idea>('POST', `/api/ideas/${id}/plan`, { date, time: time ?? undefined }),
   doneIdea: (id: string, done = true) => request<Idea>('POST', `/api/ideas/${id}/done`, { done }),
   removeIdea: (id: string) => request<{ ok: true }>('DELETE', `/api/ideas/${id}`),
@@ -189,7 +276,8 @@ export const api = {
   emailRemove: () => request<MeResponse>('DELETE', '/api/email'),
   emailLogin: (email: string) => request<{ ok: true }>('POST', '/api/email/login', { email }),
   emailLoginConfirm: (email: string, code: string) => request<{ token: string; me: MeResponse }>('POST', '/api/email/login/confirm', { email, code }),
-  pushTest: () => request<{ sent: number; failed: number; statuses: number[]; reasons?: string[]; tooSoon?: boolean; disabled?: boolean }>('POST', '/api/push/test'),
+  pushTest: () =>
+    request<{ sent: number; failed: number; statuses: number[]; reasons?: string[]; tooSoon?: boolean; disabled?: boolean }>('POST', '/api/push/test'),
   stats: (key: string, days: number) => request<StatsResponse>('GET', `/api/stats?key=${encodeURIComponent(key)}&days=${days}`),
   statsExcludeMe: (key: string) => request<{ ok: true }>('POST', `/api/stats/exclude-me?key=${encodeURIComponent(key)}`, {}),
   statsExclude: (key: string, pairId: string) => request<{ ok: true }>('POST', `/api/stats/exclude/${pairId}?key=${encodeURIComponent(key)}`, {}),
@@ -269,7 +357,16 @@ export interface PmfResponse {
     sessionsHistogram: Array<{ label: string; n: number }>;
   };
   weekly: Array<{ weekStart: string; activePairs: number; completePairs: number; sessions: number }>;
-  features: Array<{ key: string; label: string; pairs: number; share: number | null; events: number; liftUsers: number; liftUsed: number | null; liftOthers: number | null }>;
+  features: Array<{
+    key: string;
+    label: string;
+    pairs: number;
+    share: number | null;
+    events: number;
+    liftUsers: number;
+    liftUsed: number | null;
+    liftOthers: number | null;
+  }>;
   cohorts: Array<{ weekStart: string; size: number; weeks: Array<number | null> }>;
   activation: Array<[string, number]>;
   access: Array<[string, number]>;

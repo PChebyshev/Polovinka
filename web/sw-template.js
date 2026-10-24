@@ -77,10 +77,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (req.mode === 'navigate') {
-    // Оболочка из кэша, если сеть не ответила за 6 секунд; без кэша — ждём сеть
-    const live = fetch(req);
-    event.respondWith(fetchWithTimeout(req, NAVIGATE_TIMEOUT).catch(() => caches.match('/index.html').then((hit) => hit || live)));
-    event.waitUntil(live.catch(() => undefined));
+    // Оболочка — сразу из кэша (новая версия приедет с обновлением service worker'а);
+    // без кэша — сеть, но не дольше 6 секунд до повторной попытки через кэш
+    event.respondWith(
+      caches.match('/index.html').then((hit) => hit || fetchWithTimeout(req, NAVIGATE_TIMEOUT).catch(() => caches.match('/index.html').then((h) => h || fetch(req)))),
+    );
     return;
   }
 

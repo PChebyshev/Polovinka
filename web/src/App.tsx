@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactElement } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from './lib/store';
 import { Onboarding } from './screens/Onboarding';
@@ -12,25 +12,95 @@ import { Spinner } from './components/ui';
 import { GestureCard } from './components/GestureToast';
 import { api } from './lib/api';
 
-// Главная, онбординг и настройки — в основном куске; остальное подгружается при заходе, чтобы на слабой сети приложение открывалось быстрее
-const Together = lazy(() => import('./screens/Together').then((m) => ({ default: m.Together })));
-const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
-const CelebrationOverlay = lazy(() => import('./components/Celebration').then((m) => ({ default: m.CelebrationOverlay })));
-const Friend = lazy(() => import('./screens/Friend').then((m) => ({ default: m.Friend })));
-const Recommend = lazy(() => import('./screens/Recommend').then((m) => ({ default: m.Recommend })));
-const Book = lazy(() => import('./screens/Book').then((m) => ({ default: m.Book })));
-const Privacy = lazy(() => import('./screens/Privacy').then((m) => ({ default: m.Privacy })));
-const History = lazy(() => import('./screens/History').then((m) => ({ default: m.History })));
-const Week = lazy(() => import('./screens/Week').then((m) => ({ default: m.Week })));
-const WeekPublicScreen = lazy(() => import('./screens/WeekPublic').then((m) => ({ default: m.WeekPublicScreen })));
-const Challenge = lazy(() => import('./screens/Challenge').then((m) => ({ default: m.Challenge })));
-const NewChallenge = lazy(() => import('./screens/NewChallenge').then((m) => ({ default: m.NewChallenge })));
-const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })));
-const Install = lazy(() => import('./screens/Install').then((m) => ({ default: m.Install })));
-const Levels = lazy(() => import('./screens/Levels').then((m) => ({ default: m.Levels })));
-const Topics = lazy(() => import('./screens/Topics').then((m) => ({ default: m.Topics })));
-const Capsule = lazy(() => import('./screens/Capsule').then((m) => ({ default: m.Capsule })));
-const DesktopQr = lazy(() => import('./screens/DesktopQr').then((m) => ({ default: m.DesktopQr })));
+// Главная, онбординг и настройки — в основном куске; остальное подгружается при заходе, чтобы на слабой сети приложение открывалось быстрее.
+// Если кусок не нашёлся (приложение обновилось, пока вкладка была открыта) — один раз перезагружаемся.
+function screen<T>(load: () => Promise<T>, pick: (m: T) => ComponentType<any>) {
+  return lazy(() =>
+    load().then(
+      (m) => ({ default: pick(m) }),
+      (e: unknown) => {
+        const k = 'polovinka.chunkReload';
+        if (!sessionStorage.getItem(k)) {
+          sessionStorage.setItem(k, '1');
+          location.reload();
+        }
+        throw e;
+      },
+    ),
+  );
+}
+const Together = screen(
+  () => import('./screens/Together'),
+  (m) => m.Together,
+);
+const Settings = screen(
+  () => import('./screens/Settings'),
+  (m) => m.Settings,
+);
+const CelebrationOverlay = screen(
+  () => import('./components/Celebration'),
+  (m) => m.CelebrationOverlay,
+);
+const Friend = screen(
+  () => import('./screens/Friend'),
+  (m) => m.Friend,
+);
+const Recommend = screen(
+  () => import('./screens/Recommend'),
+  (m) => m.Recommend,
+);
+const Book = screen(
+  () => import('./screens/Book'),
+  (m) => m.Book,
+);
+const Privacy = screen(
+  () => import('./screens/Privacy'),
+  (m) => m.Privacy,
+);
+const History = screen(
+  () => import('./screens/History'),
+  (m) => m.History,
+);
+const Week = screen(
+  () => import('./screens/Week'),
+  (m) => m.Week,
+);
+const WeekPublicScreen = screen(
+  () => import('./screens/WeekPublic'),
+  (m) => m.WeekPublicScreen,
+);
+const Challenge = screen(
+  () => import('./screens/Challenge'),
+  (m) => m.Challenge,
+);
+const NewChallenge = screen(
+  () => import('./screens/NewChallenge'),
+  (m) => m.NewChallenge,
+);
+const Stats = screen(
+  () => import('./screens/Stats'),
+  (m) => m.Stats,
+);
+const Install = screen(
+  () => import('./screens/Install'),
+  (m) => m.Install,
+);
+const Levels = screen(
+  () => import('./screens/Levels'),
+  (m) => m.Levels,
+);
+const Topics = screen(
+  () => import('./screens/Topics'),
+  (m) => m.Topics,
+);
+const Capsule = screen(
+  () => import('./screens/Capsule'),
+  (m) => m.Capsule,
+);
+const DesktopQr = screen(
+  () => import('./screens/DesktopQr'),
+  (m) => m.DesktopQr,
+);
 
 function Nav() {
   const { me } = useStore();

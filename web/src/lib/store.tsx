@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { GesturePublic, MeResponse, ServerEvent, TodayResponse } from '@polovinka/shared';
-import { api, ApiError, getToken, setToken, lastFromCache } from './api';
+import { ApiError, getToken, setToken, loadState, readSnapshot, writeSnapshot } from './api';
 import { onFlushed } from './sw';
 import { saveTokenForSw } from './queue';
 
@@ -22,9 +22,11 @@ interface Store {
 const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false);
-  const [me, setMeState] = useState<MeResponse | null>(null);
-  const [today, setTodayState] = useState<TodayResponse | null>(null);
+  // Старт со снимка прошлого раза: экран появляется сразу, сеть догоняет
+  const [snap] = useState(() => (getToken() ? readSnapshot() : null));
+  const [ready, setReady] = useState(!!snap);
+  const [me, setMeState] = useState<MeResponse | null>(snap?.me ?? null);
+  const [today, setTodayState] = useState<TodayResponse | null>(snap?.today ?? null);
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(!navigator.onLine);
   const [toast, setToast] = useState<GesturePublic | null>(null);
@@ -38,17 +40,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const m = await api.me();
-      const meCached = lastFromCache;
+      const { me: m, meCached, today: t, todayCached, todayError } = await loadState();
       setMeState((prev) => (meCached && prev ? prev : m));
-      try {
-        const t = await api.today();
-        const todayCached = lastFromCache;
+      if (t) {
         // Снимок из кэша не должен затирать оптимистичное состояние.
         setTodayState((prev) => (todayCached && prev ? prev : t));
         setOffline(todayCached);
-      } catch (e) {
-        if (e instanceof ApiError && e.code === 'no_questions_left') setError('no_questions_left');
+        if (!meCached && !todayCached) writeSnapshot(m, t);
+      } else if (todayError instanceof ApiError && todayError.code === 'no_questions_left') {
+        setError('no_questions_left');
+        if (!meCached) writeSnapshot(m, null);
       }
       setError(null);
     } catch (e) {
@@ -127,7 +128,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (data.type === 'gesture') setToast(data.gesture);
       if (data.type !== 'ping') void refresh();
     };
-    for (const t of ['pair_joined', 'partner_answered', 'revealed', 'why_added', 'bonus_added', 'gesture', 'history_deleted', 'round_replaced', 'pair_updated', 'challenge_update']) {
+    for (const t of [
+      'pair_joined',
+      'partner_answered',
+      'revealed',
+      'why_added',
+      'bonus_added',
+      'gesture',
+      'history_deleted',
+      'round_replaced',
+      'pair_updated',
+      'challenge_update',
+    ]) {
       es.addEventListener(t, handle as EventListener);
     }
     return () => {

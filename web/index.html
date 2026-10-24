@@ -34,6 +34,10 @@
     </div>
     <script>
       (function () {
+        try {
+          var t = localStorage.getItem('polovinka.token');
+          if (t && location.pathname === '/') window.__polovinkaMe = fetch('/api/me', { headers: { authorization: 'Bearer ' + t } });
+        } catch (e) {}
         var slow = setTimeout(function () {
           var s = document.getElementById('boot-slow'), b = document.getElementById('boot-reload');
           if (s) s.style.display = 'block';

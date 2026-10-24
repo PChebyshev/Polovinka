@@ -10,7 +10,15 @@ initInstall();
 registerServiceWorker();
 
 // Экран загрузки из index.html убираем после первого кадра React
-requestAnimationFrame(() => window.dispatchEvent(new Event('polovinka:ready')));
+requestAnimationFrame(() => {
+  window.dispatchEvent(new Event('polovinka:ready'));
+  // Приложение поднялось — защита от бесконечной перезагрузки при обновлении больше не нужна
+  try {
+    sessionStorage.removeItem('polovinka.chunkReload');
+  } catch {
+    /* пусто */
+  }
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
