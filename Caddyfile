@@ -7,6 +7,11 @@
 }
 
 {$DOMAIN} {
+	# Журнал запросов (IP, путь, статус): docker compose logs caddy
+	log {
+		output stdout
+		format console
+	}
 	encode zstd gzip
 	reverse_proxy app:8787 {
 		flush_interval -1

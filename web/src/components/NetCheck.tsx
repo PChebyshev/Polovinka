@@ -61,6 +61,18 @@ function verdict(r: Result): string {
 export function NetCheck() {
   const [state, setState] = useState<'idle' | 'busy' | 'done' | 'sent' | 'error'>('idle');
   const [r, setR] = useState<Result | null>(null);
+  const [reach, setReach] = useState<{ world: boolean; ru: boolean } | null>(null);
+
+  /** Сервер недоступен: есть ли вообще интернет и открываются ли российские сайты. */
+  const probe = async () => {
+    const ok = (u: string) =>
+      fetch(u, { mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(6000) }).then(
+        () => true,
+        () => false,
+      );
+    const [world, ru] = await Promise.all([ok('https://www.gstatic.com/generate_204'), ok('https://ya.ru/favicon.ico')]);
+    return { world, ru };
+  };
 
   const run = async () => {
     setState('busy');
@@ -69,11 +81,11 @@ export function NetCheck() {
       setState('done');
     } catch {
       setState('error');
+      setReach(await probe());
     }
   };
   const send = async () => {
-    if (!r) return;
-    await api.netReport({ ...r }).catch(() => undefined);
+    await api.netReport(r ? { ...r } : { note: `unreachable; world=${reach?.world} ru=${reach?.ru}` }).catch(() => undefined);
     setState('sent');
   };
 
@@ -105,12 +117,22 @@ export function NetCheck() {
           </span>
         </p>
       )}
-      {state === 'error' && <p className="mt-3 text-sm text-rose">Не удалось дойти до сервера. Это и есть ответ: связи сейчас почти нет.</p>}
+      {state === 'error' && (
+        <p className="mt-3 text-sm text-rose">
+          {reach === null
+            ? 'Не удалось дойти до сервера. Проверяем, есть ли интернет вообще…'
+            : !reach.world && !reach.ru
+              ? 'Интернета сейчас нет: не открывается ничего.'
+              : reach.world && !reach.ru
+                ? 'Интернет есть, но российские сайты не открываются — наш сервер в России. Так бывает через VPN с зарубежным выходом: попробуйте сервер VPN в России или соседней стране, либо выключите VPN для Половинки.'
+                : 'Интернет есть, российские сайты открываются, а наш сервер — нет. Отправьте отчёт, будем разбираться.'}
+        </p>
+      )}
       <div className="mt-3 flex gap-2">
         <Button variant="secondary" className="flex-1" onClick={run} disabled={state === 'busy'}>
           {state === 'busy' ? 'Измеряем…' : r ? 'Ещё раз' : 'Проверить'}
         </Button>
-        {r && state !== 'sent' && (
+        {(r || state === 'error') && state !== 'sent' && (
           <Button className="flex-1" onClick={send}>
             Отправить отчёт
           </Button>
