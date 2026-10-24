@@ -11,6 +11,7 @@ import { LoginCodeBox } from '../components/LoginCode';
 import { EmailBox, RecoveryBox, RevokeBox } from '../components/Access';
 import { CATEGORY_LABELS, GESTURE_LABELS, LEVEL_HUG, isCategoryUnlocked, isCategoryVisible } from '@polovinka/shared';
 import { AboutUs } from '../components/AboutUs';
+import { NetCheck } from '../components/NetCheck';
 import { Chip } from '../components/ui';
 
 export function Settings() {
@@ -214,6 +215,10 @@ export function Settings() {
 
       <div className="mt-4">
         <InstallCard force />
+      </div>
+
+      <div className="mt-4">
+        <NetCheck />
       </div>
 
       <Card className="mt-4">

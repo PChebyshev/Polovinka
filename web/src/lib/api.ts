@@ -282,6 +282,7 @@ export const api = {
   statsExcludeMe: (key: string) => request<{ ok: true }>('POST', `/api/stats/exclude-me?key=${encodeURIComponent(key)}`, {}),
   statsExclude: (key: string, pairId: string) => request<{ ok: true }>('POST', `/api/stats/exclude/${pairId}?key=${encodeURIComponent(key)}`, {}),
   statsInclude: (key: string, pairId: string) => request<{ ok: true }>('DELETE', `/api/stats/exclude/${pairId}?key=${encodeURIComponent(key)}`),
+  netReport: (body: Record<string, unknown>) => request<{ ok: true }>('POST', '/api/net/report', body),
   needs: (ranks: string[], other?: string, gender?: 'm' | 'f') => request<MeResponse>('POST', '/api/needs', { ranks, other, gender }),
   survey: (body: { disappoint: 'very' | 'somewhat' | 'not'; benefit?: string; missing?: string }) => request<MeResponse>('POST', '/api/survey', body),
 };
@@ -427,6 +428,19 @@ export interface CampaignStats {
 
 export interface StatsResponse {
   pmf: PmfResponse;
+  netReports: Array<{
+    at: string;
+    rtt: number | null;
+    ttfb: number | null;
+    kbps: number | null;
+    nav: number | null;
+    sw: boolean;
+    snapshot: boolean;
+    standalone: boolean;
+    conn: string | null;
+    note: string | null;
+    ua: string;
+  }>;
   badQuestions: {
     total: number;
     reasons: Record<string, number>;

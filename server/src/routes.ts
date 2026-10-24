@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { MeResponse, TodayResponse, GestureType } from '../../shared/src/types.js';
 import { GESTURE_LABELS } from '../../shared/src/types.js';
@@ -64,7 +65,10 @@ function createSoloPair(tz: string, guest = false): PairRow {
 }
 
 function challengeByCodeRow(code: string) {
-  return one<{ id: string; code: string; from_pair_id: string; question_ids: string; created_at: string; opened_count: number }>('SELECT * FROM challenges WHERE code = ?', code.trim().toLowerCase());
+  return one<{ id: string; code: string; from_pair_id: string; question_ids: string; created_at: string; opened_count: number }>(
+    'SELECT * FROM challenges WHERE code = ?',
+    code.trim().toLowerCase(),
+  );
 }
 
 function meResponse(user: UserRow): MeResponse {
@@ -103,12 +107,47 @@ function normalizeChoice(raw: unknown, format: string, me: UserRow, partner: Use
   if (typeof raw !== 'string') return null;
   if (format === 'scale') return /^[1-5]$/.test(raw) ? raw : null;
   if (raw !== 'a' && raw !== 'b') return null;
-  if (format === 'who') return raw === 'a' ? me.id : partner?.id ?? null;
+  if (format === 'who') return raw === 'a' ? me.id : (partner?.id ?? null);
   return raw;
 }
 
 export async function registerRoutes(app: FastifyInstance, opts: { dataDir: string }) {
   app.get('/api/health', async () => ({ ok: true }));
+
+  // --- Проверка связи: откуда берётся время загрузки у человека ---------------------
+  app.get('/api/net/ping', async (_req, reply) => {
+    reply.header('cache-control', 'no-store');
+    return { t: Date.now() };
+  });
+  /** 200 КБ случайных байт — несжимаемые, чтобы измерить реальную скорость канала. */
+  const blob = randomBytes(200 * 1024);
+  app.get('/api/net/blob', async (_req, reply) => {
+    reply.header('cache-control', 'no-store').header('content-type', 'application/octet-stream');
+    return reply.send(blob);
+  });
+  app.post('/api/net/report', { preHandler: requireUser }, async (req) => {
+    const user = req.user!;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const num = (k: string) => (typeof b[k] === 'number' && Number.isFinite(b[k]) ? Math.round(b[k] as number) : null);
+    const str = (k: string, n: number) => (typeof b[k] === 'string' ? (b[k] as string).slice(0, n) : null);
+    logEvent('net_report', {
+      pairId: user.pair_id,
+      userId: user.id,
+      meta: {
+        rtt: num('rtt'),
+        ttfb: num('ttfb'),
+        kbps: num('kbps'),
+        nav: num('nav'),
+        sw: b.sw === true,
+        snapshot: b.snapshot === true,
+        standalone: b.standalone === true,
+        conn: str('conn', 20),
+        note: str('note', 200),
+        ua: (req.headers['user-agent'] ?? '').slice(0, 160),
+      },
+    });
+    return { ok: true };
+  });
 
   // --- Аккаунт -------------------------------------------------------------
 
@@ -147,15 +186,7 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
       }
     }
 
-    run(
-      'INSERT INTO users (id, name, token_hash, pair_id, tz, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      id,
-      name,
-      hashToken(token),
-      pair.id,
-      tz,
-      ts,
-    );
+    run('INSERT INTO users (id, name, token_hash, pair_id, tz, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, name, hashToken(token), pair.id, tz, ts);
     logEvent('user_created', { pairId: pair.id, userId: id, meta: { joined } });
     if (!joined && typeof body.ref === 'string') {
       const from = refPair(body.ref.trim().toLowerCase());
@@ -200,8 +231,10 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     }
     if (isValidTz(body.tz)) run('UPDATE users SET tz = ? WHERE id = ?', body.tz, user.id);
     const time = /^([01]\d|2[0-3]):[0-5]\d$/;
-    if (typeof body.notifMorning === 'string' && time.test(body.notifMorning)) run('UPDATE users SET notif_morning = ? WHERE id = ?', body.notifMorning, user.id);
-    if (typeof body.notifEvening === 'string' && time.test(body.notifEvening)) run('UPDATE users SET notif_evening = ? WHERE id = ?', body.notifEvening, user.id);
+    if (typeof body.notifMorning === 'string' && time.test(body.notifMorning))
+      run('UPDATE users SET notif_morning = ? WHERE id = ?', body.notifMorning, user.id);
+    if (typeof body.notifEvening === 'string' && time.test(body.notifEvening))
+      run('UPDATE users SET notif_evening = ? WHERE id = ?', body.notifEvening, user.id);
     if (typeof body.notifEnabled === 'boolean') run('UPDATE users SET notif_enabled = ? WHERE id = ?', body.notifEnabled ? 1 : 0, user.id);
     return meResponse(one<UserRow>('SELECT * FROM users WHERE id = ?', user.id)!);
   });
@@ -305,10 +338,26 @@ export async function registerRoutes(app: FastifyInstance, opts: { dataDir: stri
     const date = dateInTz(pair.tz);
     const count = one<{ n: number }>(`SELECT COUNT(*) AS n FROM rounds WHERE pair_id = ? AND date = ? AND kind = 'bonus'`, pair.id, date);
     if (Number(count?.n ?? 0) >= MAX_BONUS_PER_DAY) return reply.code(409).send({ error: 'bonus_limit' });
-    const q = pickQuestion({ pairId: pair.id, pairCreatedAt: pair.created_at, tz: pair.tz, date, kind: 'bonus', seedSalt: String(count?.n ?? 0), solo: !partner, theme: pair.week_theme });
+    const q = pickQuestion({
+      pairId: pair.id,
+      pairCreatedAt: pair.created_at,
+      tz: pair.tz,
+      date,
+      kind: 'bonus',
+      seedSalt: String(count?.n ?? 0),
+      solo: !partner,
+      theme: pair.week_theme,
+    });
     if (!q) return reply.code(503).send({ error: 'no_questions_left' });
     const id = newId();
-    run(`INSERT INTO rounds (id, pair_id, question_id, date, kind, status, created_at) VALUES (?, ?, ?, ?, 'bonus', 'open', ?)`, id, pair.id, q.id, date, nowIso());
+    run(
+      `INSERT INTO rounds (id, pair_id, question_id, date, kind, status, created_at) VALUES (?, ?, ?, ?, 'bonus', 'open', ?)`,
+      id,
+      pair.id,
+      q.id,
+      date,
+      nowIso(),
+    );
     logEvent('bonus_started', { pairId: pair.id, userId: user.id });
     const round = one<RoundRow>('SELECT * FROM rounds WHERE id = ?', id)!;
     sendTo(partner?.id, { type: 'bonus_added', roundId: id });

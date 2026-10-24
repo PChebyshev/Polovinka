@@ -13,7 +13,23 @@ export interface BadQuestionStat {
   comments: string[];
 }
 
+export interface NetReport {
+  at: string;
+  rtt: number | null;
+  ttfb: number | null;
+  kbps: number | null;
+  nav: number | null;
+  sw: boolean;
+  snapshot: boolean;
+  standalone: boolean;
+  conn: string | null;
+  note: string | null;
+  ua: string;
+}
+
 export interface StatsResponse {
+  /** Отчёты «Проверки связи» из настроек: где теряется время у людей. */
+  netReports: NetReport[];
   /** «Плохие вопросы» за всё время: что отмечают и почему. */
   badQuestions: { total: number; reasons: Record<string, number>; top: BadQuestionStat[] };
   generatedAt: string;
@@ -201,6 +217,12 @@ export function computeStats(periodDays = 30): StatsResponse {
   return {
     push,
     badQuestions: badQuestions(),
+    netReports: all<{ created_at: string; meta: string }>(
+      `SELECT created_at, meta FROM events WHERE type = 'net_report' ORDER BY created_at DESC LIMIT 30`,
+    ).map((r) => ({
+      at: r.created_at,
+      ...(JSON.parse(r.meta) as Omit<NetReport, 'at'>),
+    })),
     generatedAt: new Date().toISOString(),
     periodDays,
     totals: { users, pairsComplete, pairsGuest, pairsSolo, pushSubscribed },

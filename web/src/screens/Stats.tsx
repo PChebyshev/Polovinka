@@ -250,6 +250,34 @@ export function Stats() {
 
       <BadQuestions b={data.badQuestions} />
 
+      {data.netReports.length > 0 && (
+        <Card className="mt-6">
+          <Label>Проверка связи</Label>
+          <p className="mt-2 text-xs text-muted">
+            Отчёты из Настроек → «Проверка связи». Задержка — медиана пяти коротких запросов; скорость — по файлу в 200 КБ.
+          </p>
+          <div className="mt-3 space-y-2">
+            {data.netReports.map((r, i) => (
+              <div key={i} className="rounded-2xl bg-surface-2 px-3 py-2 text-xs">
+                <div className="flex flex-wrap gap-x-3 tabular-nums">
+                  <span className="text-muted">
+                    {new Date(r.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span>задержка {r.rtt ?? '—'} мс</span>
+                  <span>первый байт {r.ttfb ?? '—'} мс</span>
+                  <span>{r.kbps !== null ? (r.kbps >= 1024 ? `${(r.kbps / 1024).toFixed(1)} Мбит/с` : `${r.kbps} кбит/с`) : '—'}</span>
+                  {r.nav !== null && <span>страница {r.nav} мс</span>}
+                </div>
+                <div className="mt-0.5 text-muted">
+                  {r.standalone ? 'с иконки' : 'в браузере'} · {r.sw ? 'кэш есть' : 'без кэша'} · {r.snapshot ? 'снимок есть' : 'без снимка'}
+                  {r.conn ? ` · ${r.conn}` : ''} · {r.ua.replace(/^Mozilla\/5\.0 \(/, '').slice(0, 60)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Label className="mt-8">Всего</Label>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Tile n={String(t.users)} label="пользователей" />

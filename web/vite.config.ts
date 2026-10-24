@@ -15,7 +15,13 @@ function serviceWorker(): Plugin {
     },
     closeBundle() {
       const assetsDir = join(outDir, 'assets');
-      const assets = existsSync(assetsDir) ? readdirSync(assetsDir).map((f) => `/assets/${f}`) : [];
+      // Предзагружаем только ядро (index, vendor, css): остальные куски кэшируются при первом заходе на экран,
+      // чтобы установка service worker'а не забивала узкий канал
+      const assets = existsSync(assetsDir)
+        ? readdirSync(assetsDir)
+            .filter((f) => /^(index|vendor)-/.test(f))
+            .map((f) => `/assets/${f}`)
+        : [];
       const shell = ['/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', ...assets];
       const version = Date.now().toString(36);
       const tpl = readFileSync('sw-template.js', 'utf8').replace("'__VERSION__'", JSON.stringify(version)).replace("'__ASSETS__'", JSON.stringify(shell));
