@@ -13,6 +13,7 @@ export function InstallCard({ force = false }: { force?: boolean }) {
   const [, bump] = useState(0);
   const [hidden, setHidden] = useState(() => !shouldOfferInstall() || (!force && installDismissed()));
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   useEffect(() => onInstallChange(() => bump((n) => n + 1)), []);
   useEffect(() => {
     if (!hidden) void api.track('install_prompt_shown');
@@ -23,11 +24,14 @@ export function InstallCard({ force = false }: { force?: boolean }) {
 
   const goIos = async () => {
     setBusy(true);
+    setFailed(false);
     try {
       const r = await api.createHandoff();
       // Полная загрузка страницы: сервер подставит в манифест адрес запуска с кодом.
       window.location.assign(`/install?h=${encodeURIComponent(r.code)}`);
     } catch {
+      // Сеть не ответила (таймаут): скажем об этом, а не промолчим
+      setFailed(true);
       setBusy(false);
     }
   };
@@ -38,13 +42,14 @@ export function InstallCard({ force = false }: { force?: boolean }) {
       <p className="mt-2 text-sm text-muted">{APP_NAME} будет открываться одной иконкой, и придут уведомления: утром — вопрос, вечером — раскрытие.</p>
       {ios ? (
         <Button className="mt-3 w-full" onClick={goIos} disabled={busy}>
-          Установить на экран
+          {busy ? 'Готовим…' : 'Установить на экран'}
         </Button>
       ) : (
         <div className="mt-3">
           <InstallGuide finalStep={`Откройте ${APP_NAME_ACC} с иконки — вы уже будете в своём аккаунте.`} />
         </div>
       )}
+      {failed && <p className="mt-2 text-sm text-rose">Сервер не ответил. Если включён VPN, попробуйте без него или добавьте polovinka.online в исключения.</p>}
       {!force && (
         <button
           className="mt-2 w-full py-1 text-center text-xs text-muted"
