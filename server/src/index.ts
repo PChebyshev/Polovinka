@@ -147,14 +147,16 @@ if (WEB_DIST) {
     prefix: '/',
     wildcard: false,
     index: false,
-    cacheControl: true,
-    maxAge: '1h',
-    immutable: false,
+    // Cache-Control ставим сами: встроенный cacheControl перекрывал setHeaders, и sw.js с index.html
+    // кэшировались на час — браузер подхватывал обновления с опозданием и собирал оболочку из старого index.html
+    cacheControl: false,
     setHeaders(res, filePath) {
       if (filePath.includes(`${join(WEB_DIST, 'assets')}`)) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      } else if (filePath.endsWith('sw.js') || filePath.endsWith('manifest.webmanifest')) {
+      } else if (filePath.endsWith('sw.js') || filePath.endsWith('manifest.webmanifest') || filePath.endsWith('index.html')) {
         res.setHeader('Cache-Control', 'no-cache');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=3600');
       }
     },
   });

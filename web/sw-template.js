@@ -9,7 +9,9 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
-      .then((c) => c.addAll(SHELL))
+      // cache: 'reload' — брать с сервера, а не из HTTP-кэша браузера: старый index.html в новой
+      // оболочке ссылался бы на файлы, которых больше нет, и приложение не открывалось бы вовсе
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });

@@ -30,10 +30,23 @@
       <div>Половинка</div>
       <div class="hint" id="boot-slow">Сеть отвечает медленно. Если включён VPN, попробуйте выключить его — сервер в России, и без VPN путь короче.</div>
       <div class="hint" id="boot-error">Не удалось загрузить приложение. Проверьте связь и попробуйте ещё раз.</div>
-      <button id="boot-reload" style="display: none" onclick="location.reload()">Обновить</button>
+      <button id="boot-reload" style="display: none" onclick="window.__hardReload()">Обновить</button>
     </div>
     <script>
       (function () {
+        // Полный сброс: снять service worker и стереть кэш приложения, затем загрузить заново с сервера.
+        // Нужен, когда в кэше оказалась сломанная версия — обычная перезагрузка вернула бы её же.
+        window.__hardReload = function () {
+          var done = false;
+          var go = function () { if (done) return; done = true; location.reload(); };
+          setTimeout(go, 4000);
+          try {
+            var p = [];
+            if (navigator.serviceWorker) p.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+            if (window.caches) p.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+            Promise.all(p).then(go, go);
+          } catch (e) { go(); }
+        };
         try {
           var t = localStorage.getItem('polovinka.token');
           if (t && location.pathname === '/') window.__polovinkaMe = fetch('/api/me', { headers: { authorization: 'Bearer ' + t } });
@@ -49,11 +62,11 @@
           if (!document.getElementById('boot') || !t || !(t.tagName === 'SCRIPT' || t.tagName === 'LINK')) return;
           clearTimeout(slow);
           try {
-            if (!sessionStorage.getItem('polovinka.bootRetry')) {
-              sessionStorage.setItem('polovinka.bootRetry', '1');
-              setTimeout(function () { location.reload(); }, 2000);
-              return;
-            }
+            var tries = Number(sessionStorage.getItem('polovinka.bootRetry') || 0);
+            sessionStorage.setItem('polovinka.bootRetry', String(tries + 1));
+            // первый раз — простая перезагрузка, второй — со сбросом кэша; дальше показываем кнопку
+            if (tries === 0) { setTimeout(function () { location.reload(); }, 2000); return; }
+            if (tries === 1) { setTimeout(window.__hardReload, 1500); return; }
           } catch (e) {}
           var s = document.getElementById('boot-slow'), e = document.getElementById('boot-error'), b = document.getElementById('boot-reload');
           if (s) s.style.display = 'none';
