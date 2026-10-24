@@ -13,6 +13,21 @@
 		format console
 	}
 	encode zstd gzip
+	# Приложение, открытое с основного домена, при недоступности сервера ходит к API сюда — нужен CORS
+	@cors header Origin https://{$ORIGIN}
+	header @cors {
+		Access-Control-Allow-Origin "https://{$ORIGIN}"
+		Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+		Access-Control-Allow-Headers "authorization, content-type"
+		Access-Control-Max-Age "86400"
+		Vary Origin
+		defer
+	}
+	@preflight {
+		method OPTIONS
+		header Origin https://{$ORIGIN}
+	}
+	respond @preflight 204
 	reverse_proxy https://{$ORIGIN} {
 		header_up Host {$ORIGIN}
 		# Основной сервер строит ссылки (приглашения, карточки) с этим доменом

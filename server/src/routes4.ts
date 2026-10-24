@@ -155,6 +155,7 @@ export async function registerStage4Routes(app: FastifyInstance, deps: { meRespo
       'qr_open',
       'desktop_handoff_shown',
       'email_gate_deferred',
+      'edge_fallback',
     ]);
     if (typeof body.type !== 'string' || !allowed.has(body.type)) return reply.code(400).send({ error: 'type' });
     logEvent(body.type, { pairId: user.pair_id, userId: user.id });

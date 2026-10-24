@@ -1,5 +1,6 @@
 import { enqueue } from './queue';
 import { storedAttr } from './attr';
+import { EDGE_FALLBACK_HOST } from '@polovinka/shared';
 import type { BookResponse, CapsulePublic, CareHint, DigestResponse, Idea, MemoryCard, PairStage, RoundIdea, TopicProgress } from '@polovinka/shared';
 import type {
   ChallengeCompare,
@@ -84,6 +85,53 @@ async function request<T>(method: string, path: string, body?: unknown, opts: { 
   return (await requestMeta<T>(method, path, body, opts)).data;
 }
 
+// --- Запасной вход -----------------------------------------------------------------------
+// Основной сервер в России; через VPN до него часто не достучаться, а до зарубежного входа — да.
+// Если запрос не дошёл, один раз проверяем вход и, если он отвечает, ходим через него до конца сессии.
+
+let apiBase = '';
+let edgeProbe: Promise<boolean> | null = null;
+
+function edgeHost(): string | null {
+  try {
+    const custom = localStorage.getItem('polovinka.edgeHost');
+    if (custom === 'off') return null;
+    const h = custom || EDGE_FALLBACK_HOST;
+    return h && h !== location.hostname ? h : null;
+  } catch {
+    return EDGE_FALLBACK_HOST === location.hostname ? null : EDGE_FALLBACK_HOST;
+  }
+}
+
+/** Полный адрес API с учётом запасного входа. */
+export function apiUrl(path: string): string {
+  return apiBase + path;
+}
+
+export function viaEdge(): boolean {
+  return apiBase !== '';
+}
+
+/** Сеть до основного сервера не ответила: проверяем запасной вход (раз за сессию). */
+function tryEdge(): Promise<boolean> {
+  if (apiBase) return Promise.resolve(true);
+  // Несколько запросов падают одновременно — проверка одна на всех
+  edgeProbe ??= (async () => {
+    const host = edgeHost();
+    if (!host || !navigator.onLine) return false;
+    try {
+      const r = await fetch(`https://${host}/api/net/ping`, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+      if (!r.ok) return false;
+      apiBase = `https://${host}`;
+      void track('edge_fallback');
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return edgeProbe;
+}
+
 declare global {
   interface Window {
     /** index.html начинает грузить /api/me, пока едет скрипт приложения. */
@@ -102,14 +150,20 @@ async function requestMeta<T>(method: string, path: string, body?: unknown, opts
     const early = method === 'GET' && path === '/api/me' ? window.__polovinkaMe : undefined;
     if (early) window.__polovinkaMe = undefined;
     // Не ждать вечно: через VPN или на слабой сети лучше ошибка (и очередь для ответов), чем бесконечный спиннер
-    res =
-      (await early?.catch(() => undefined)) ??
-      (await fetch(path, {
+    const go = () =>
+      fetch(apiUrl(path), {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(method === 'GET' ? 25_000 : 20_000),
-      }));
+      });
+    try {
+      res = (await early?.catch(() => undefined)) ?? (await go());
+    } catch (e) {
+      // Основной сервер не ответил — пробуем через запасной вход
+      if (!(await tryEdge())) throw e;
+      res = await go();
+    }
   } catch (e) {
     if (opts.queue && body !== undefined) {
       await enqueue({ method: method as 'POST', path, body: JSON.stringify(body) });
@@ -215,7 +269,7 @@ export const api = {
   weekShared: (via: string) => request<{ ok: true }>('POST', `/api/week/x/shared`, { via }),
   uploadWeekImage: async (code: string, blob: Blob) => {
     const token = getToken();
-    const res = await fetch(`/api/week/${code}/image`, {
+    const res = await fetch(apiUrl(`/api/week/${code}/image`), {
       method: 'POST',
       headers: { 'content-type': 'image/png', ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: blob,
@@ -300,7 +354,7 @@ export interface AppConfig {
 export async function downloadExport(): Promise<'ok' | 'error'> {
   const token = getToken();
   try {
-    const res = await fetch('/api/export', { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    const res = await fetch(apiUrl('/api/export'), { headers: token ? { authorization: `Bearer ${token}` } : {} });
     if (!res.ok) return 'error';
     const blob = await res.blob();
     const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'polovinka.json';

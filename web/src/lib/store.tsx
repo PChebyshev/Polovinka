@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { GesturePublic, MeResponse, ServerEvent, TodayResponse } from '@polovinka/shared';
-import { ApiError, getToken, setToken, loadState, readSnapshot, writeSnapshot } from './api';
+import { ApiError, apiUrl, getToken, setToken, loadState, readSnapshot, writeSnapshot, viaEdge } from './api';
 import { onFlushed } from './sw';
 import { saveTokenForSw } from './queue';
 
@@ -31,6 +31,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [toast, setToast] = useState<GesturePublic | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  // Поток событий открыли до того, как переключились на запасной вход — пересоздаём
+  const [sseGen, setSseGen] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!getToken()) {
@@ -115,8 +117,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = getToken();
     if (!me || !token || !visible) return;
-    const es = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
+    const url = apiUrl(`/api/events?token=${encodeURIComponent(token)}`);
+    const es = new EventSource(url);
     esRef.current = es;
+    es.addEventListener('error', () => {
+      if (viaEdge() && url !== apiUrl(`/api/events?token=${encodeURIComponent(token)}`)) setSseGen((g) => g + 1);
+    });
     const handle = (ev: MessageEvent) => {
       let data: ServerEvent | null = null;
       try {
@@ -146,7 +152,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       es.close();
       esRef.current = null;
     };
-  }, [me?.user.id, refresh, visible]);
+  }, [me?.user.id, refresh, visible, sseGen]);
 
   const value = useMemo<Store>(
     () => ({

@@ -1,4 +1,5 @@
 /** Офлайн-очередь запросов в IndexedDB. Читается и страницей, и service worker'ом. */
+import { apiUrl } from './api';
 
 export interface QueueItem {
   id: string;
@@ -72,7 +73,7 @@ export async function flushQueue(token: string | null): Promise<number> {
     for (const it of items) {
       let res: Response;
       try {
-        res = await fetch(it.path, {
+        res = await fetch(apiUrl(it.path), {
           method: it.method,
           headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
           body: it.body,
