@@ -67,7 +67,9 @@ export function Onboarding({
   const [phrase, setPhrase] = useState('');
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
-  const [emailLogin, setEmailLogin] = useState(false);
+  // Вход по почте показываем сразу: если /api/config не дошёл (слабая сеть, VPN), ссылка не должна пропадать.
+  // Сервер скажет false только когда почта и правда не настроена.
+  const [emailLogin, setEmailLogin] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(
     handoffFailed ? 'Автоматический вход не сработал. Введите код из Safari: Настройки → «Вход на другом устройстве».' : null,
