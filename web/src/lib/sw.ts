@@ -27,14 +27,23 @@ export async function flushNow(): Promise<void> {
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
   void saveTokenForSw(getToken());
-  const startedAt = Date.now();
-  // Новая версия: пока страница только открылась — перезагружаемся на неё сразу, иначе подхватится при следующем запуске
+  let resumedAt = Date.now();
+  // Новая версия пришла в первые секунды после открытия или возврата в приложение — перезагружаемся на неё сразу
+  // (человек ещё ничего не начал делать); иначе она подхватится при следующем запуске
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (Date.now() - startedAt < 20_000 && document.visibilityState === 'visible') location.reload();
+    if (Date.now() - resumedAt < 20_000 && document.visibilityState === 'visible') location.reload();
   });
   navigator.serviceWorker
     .register('/sw.js', { updateViaCache: 'none' })
-    .then((reg) => reg.update().catch(() => undefined))
+    .then((reg) => {
+      void reg.update().catch(() => undefined);
+      // iOS не закрывает приложение на экране «Домой» днями — проверяем обновление при каждом возврате
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState !== 'visible') return;
+        resumedAt = Date.now();
+        void reg.update().catch(() => undefined);
+      });
+    })
     .catch(() => undefined);
   navigator.serviceWorker.addEventListener('message', (e) => {
     const d = e.data as { type?: string; sent?: number };

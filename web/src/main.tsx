@@ -15,6 +15,7 @@ requestAnimationFrame(() => {
   // Приложение поднялось — защита от бесконечной перезагрузки при обновлении больше не нужна
   try {
     sessionStorage.removeItem('polovinka.chunkReload');
+    sessionStorage.removeItem('polovinka.bootRetry');
   } catch {
     /* пусто */
   }

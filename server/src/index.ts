@@ -161,6 +161,8 @@ if (WEB_DIST) {
 
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api/')) return reply.code(404).send({ error: 'not_found' });
+    // Кусок старой сборки после обновления: 404, иначе браузер получит HTML вместо скрипта
+    if (req.url.startsWith('/assets/') || req.url === '/sw.js') return reply.code(404).type('text/plain').send('not found');
     const base = publicBase(req);
     const og = ogFor(req.url.split('?')[0], base);
     const tags = [

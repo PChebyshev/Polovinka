@@ -48,6 +48,13 @@
           var t = ev.target;
           if (!document.getElementById('boot') || !t || !(t.tagName === 'SCRIPT' || t.tagName === 'LINK')) return;
           clearTimeout(slow);
+          try {
+            if (!sessionStorage.getItem('polovinka.bootRetry')) {
+              sessionStorage.setItem('polovinka.bootRetry', '1');
+              setTimeout(function () { location.reload(); }, 2000);
+              return;
+            }
+          } catch (e) {}
           var s = document.getElementById('boot-slow'), e = document.getElementById('boot-error'), b = document.getElementById('boot-reload');
           if (s) s.style.display = 'none';
           if (e) e.style.display = 'block';

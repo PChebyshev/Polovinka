@@ -15,10 +15,15 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Старые оболочки чистим, но одну предыдущую оставляем: страница прошлой версии могла ещё
+  // не догрузить свои куски, и удалять их у неё из-под ног — верный способ получить «не удалось загрузить»
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('shell-') && k !== SHELL_CACHE).map((k) => caches.delete(k))))
+      .then((keys) => {
+        const old = keys.filter((k) => k.startsWith('shell-') && k !== SHELL_CACHE).sort();
+        return Promise.all(old.slice(0, -1).map((k) => caches.delete(k)));
+      })
       .then(() => self.clients.claim()),
   );
 });
@@ -87,7 +92,7 @@ self.addEventListener('fetch', (event) => {
 
   if (req.method === 'GET') {
     event.respondWith(
-      caches.match(req).then(
+      caches.match(req, { ignoreSearch: false }).then(
         (hit) =>
           hit ||
           fetch(req).then((res) => {
