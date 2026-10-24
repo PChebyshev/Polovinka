@@ -9,6 +9,9 @@ import { initInstall } from './lib/install';
 initInstall();
 registerServiceWorker();
 
+// Экран загрузки из index.html убираем после первого кадра React
+requestAnimationFrame(() => window.dispatchEvent(new Event('polovinka:ready')));
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <StoreProvider>

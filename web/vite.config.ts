@@ -35,5 +35,11 @@ export default defineConfig({
   build: {
     sourcemap: false,
     target: 'es2020',
+    rollupOptions: {
+      output: {
+        // Библиотеки — отдельным куском: он не меняется от обновления к обновлению и остаётся в кэше
+        manualChunks: (id) => (id.includes('node_modules') ? 'vendor' : undefined),
+      },
+    },
   },
 });

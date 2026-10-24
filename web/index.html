@@ -14,9 +14,43 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Половинка</title>
     <!--og-->
+    <style>
+      html { background: #17111f; color: #fbf0f6; }
+      #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font: 15px -apple-system, system-ui, sans-serif; text-align: center; padding: 24px; }
+      #boot .heart { width: 44px; height: 44px; animation: beat 1.2s ease-in-out infinite; }
+      #boot .hint { color: #b5a3b8; font-size: 13px; max-width: 320px; display: none; line-height: 1.4; }
+      #boot button { margin-top: 8px; border: 1px solid #3a2d45; background: #2c2036; color: #fbf0f6; border-radius: 999px; padding: 10px 20px; font: inherit; }
+      @keyframes beat { 0%, 100% { transform: scale(1); opacity: .85 } 50% { transform: scale(1.12); opacity: 1 } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot">
+      <svg class="heart" viewBox="0 0 24 24" fill="#ff7f9c"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.5 2.7 4.8 6.3 4.3c2-.3 3.9.6 5.7 2.6 1.8-2 3.7-2.9 5.7-2.6 3.6.5 5.4 4.2 3.9 7.5C19.5 16.4 12 21 12 21z"/></svg>
+      <div>Половинка</div>
+      <div class="hint" id="boot-slow">Сеть отвечает медленно. Если включён VPN, попробуйте выключить его — сервер в России, и без VPN путь короче.</div>
+      <div class="hint" id="boot-error">Не удалось загрузить приложение. Проверьте связь и попробуйте ещё раз.</div>
+      <button id="boot-reload" style="display: none" onclick="location.reload()">Обновить</button>
+    </div>
+    <script>
+      (function () {
+        var slow = setTimeout(function () {
+          var s = document.getElementById('boot-slow'), b = document.getElementById('boot-reload');
+          if (s) s.style.display = 'block';
+          if (b) b.style.display = 'inline-block';
+        }, 8000);
+        window.addEventListener('polovinka:ready', function () { clearTimeout(slow); var e = document.getElementById('boot'); if (e) e.remove(); });
+        window.addEventListener('error', function (ev) {
+          var t = ev.target;
+          if (!document.getElementById('boot') || !t || !(t.tagName === 'SCRIPT' || t.tagName === 'LINK')) return;
+          clearTimeout(slow);
+          var s = document.getElementById('boot-slow'), e = document.getElementById('boot-error'), b = document.getElementById('boot-reload');
+          if (s) s.style.display = 'none';
+          if (e) e.style.display = 'block';
+          if (b) b.style.display = 'inline-block';
+        }, true);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

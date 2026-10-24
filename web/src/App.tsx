@@ -1,34 +1,36 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useStore } from './lib/store';
 import { Onboarding } from './screens/Onboarding';
 import { Home } from './screens/Home';
 import { Join } from './screens/Join';
-import { Friend } from './screens/Friend';
-import { Recommend } from './screens/Recommend';
-import { Book } from './screens/Book';
-import { Privacy } from './screens/Privacy';
-import { Together } from './screens/Together';
-import { Settings } from './screens/Settings';
-import { History } from './screens/History';
-import { Week } from './screens/Week';
-import { WeekPublicScreen } from './screens/WeekPublic';
-import { Challenge } from './screens/Challenge';
-import { NewChallenge } from './screens/NewChallenge';
-import { Stats } from './screens/Stats';
-import { Install } from './screens/Install';
-import { Levels } from './screens/Levels';
-import { Topics } from './screens/Topics';
-import { Capsule } from './screens/Capsule';
 import { isStandalone, platform, syncManifest } from './lib/install';
 import { getToken, trackScreen } from './lib/api';
 import { adoptVisitor, captureAttribution } from './lib/attr';
-import { DesktopQr } from './screens/DesktopQr';
-import { CelebrationOverlay } from './components/Celebration';
 import { EmailGate, emailGateDeferred } from './components/Access';
 import { Spinner } from './components/ui';
 import { GestureCard } from './components/GestureToast';
 import { api } from './lib/api';
+
+// Главная, онбординг и настройки — в основном куске; остальное подгружается при заходе, чтобы на слабой сети приложение открывалось быстрее
+const Together = lazy(() => import('./screens/Together').then((m) => ({ default: m.Together })));
+const Settings = lazy(() => import('./screens/Settings').then((m) => ({ default: m.Settings })));
+const CelebrationOverlay = lazy(() => import('./components/Celebration').then((m) => ({ default: m.CelebrationOverlay })));
+const Friend = lazy(() => import('./screens/Friend').then((m) => ({ default: m.Friend })));
+const Recommend = lazy(() => import('./screens/Recommend').then((m) => ({ default: m.Recommend })));
+const Book = lazy(() => import('./screens/Book').then((m) => ({ default: m.Book })));
+const Privacy = lazy(() => import('./screens/Privacy').then((m) => ({ default: m.Privacy })));
+const History = lazy(() => import('./screens/History').then((m) => ({ default: m.History })));
+const Week = lazy(() => import('./screens/Week').then((m) => ({ default: m.Week })));
+const WeekPublicScreen = lazy(() => import('./screens/WeekPublic').then((m) => ({ default: m.WeekPublicScreen })));
+const Challenge = lazy(() => import('./screens/Challenge').then((m) => ({ default: m.Challenge })));
+const NewChallenge = lazy(() => import('./screens/NewChallenge').then((m) => ({ default: m.NewChallenge })));
+const Stats = lazy(() => import('./screens/Stats').then((m) => ({ default: m.Stats })));
+const Install = lazy(() => import('./screens/Install').then((m) => ({ default: m.Install })));
+const Levels = lazy(() => import('./screens/Levels').then((m) => ({ default: m.Levels })));
+const Topics = lazy(() => import('./screens/Topics').then((m) => ({ default: m.Topics })));
+const Capsule = lazy(() => import('./screens/Capsule').then((m) => ({ default: m.Capsule })));
+const DesktopQr = lazy(() => import('./screens/DesktopQr').then((m) => ({ default: m.DesktopQr })));
 
 function Nav() {
   const { me } = useStore();
@@ -114,7 +116,11 @@ function Celebrations() {
     await api.milestoneSeen(c.key).catch(() => undefined);
     void refresh();
   };
-  return <CelebrationOverlay c={c} pairTitle={me.partner ? `${me.user.name} и ${me.partner.name}` : me.user.name} onClose={close} />;
+  return (
+    <Suspense fallback={null}>
+      <CelebrationOverlay c={c} pairTitle={me.partner ? `${me.user.name} и ${me.partner.name}` : me.user.name} onClose={close} />
+    </Suspense>
+  );
 }
 
 /** Одноразовый код из адреса запуска (/?h=…): вход в установленное приложение без ввода. */
@@ -230,36 +236,45 @@ function Shell() {
   const publicPath = ['/j/', '/f/', '/w/', '/c/', '/stats', '/privacy'].some((p) => loc.pathname.startsWith(p));
   // На компьютере новый человек видит только QR; служебные и публичные страницы открываются как есть
   const desktopFree = ['/stats', '/privacy', '/w/'].some((p) => loc.pathname.startsWith(p));
-  if (!me && gate && !desktopFree) return new URLSearchParams(loc.search).get('login') === '1' ? <Onboarding loginOnly /> : <DesktopQr />;
+  if (!me && gate && !desktopFree)
+    return new URLSearchParams(loc.search).get('login') === '1' ? (
+      <Onboarding loginOnly />
+    ) : (
+      <Suspense fallback={<Spinner />}>
+        <DesktopQr />
+      </Suspense>
+    );
   if (!me && !publicPath) return <Onboarding />;
   // Почта обязательна: после первого ответа просим привязать, чтобы аккаунт не потерялся
   if (me?.access.emailDue && !gateDeferred && !publicPath) return <EmailGate onDeferred={() => setGateDeferred(true)} />;
   return (
     <>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/together" element={<Together />} />
-        <Route path="/gesture" element={<Navigate to="/together" replace />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/history" element={<History />} />
-        <Route path="/week" element={<Week />} />
-        <Route path="/w/:code" element={<WeekPublicScreen />} />
-        <Route path="/c/:code" element={<Challenge />} />
-        <Route path="/challenge" element={<NewChallenge />} />
-        <Route path="/stats" element={<Stats />} />
-        <Route path="/install" element={<Install />} />
-        <Route path="/levels" element={<Levels />} />
-        <Route path="/topics" element={<Topics />} />
-        <Route path="/capsule" element={<Capsule />} />
-        <Route path="/j/:code" element={<Join />} />
-        <Route path="/f/:code" element={<Friend />} />
-        <Route path="/a/:code" element={<Navigate to="/" replace />} />
-        <Route path="/recommend" element={<Recommend />} />
-        <Route path="/book" element={<Book />} />
-        <Route path="/ideas" element={<Navigate to="/together" replace />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="*" element={<Home />} />
-      </Routes>
+      <Suspense fallback={<Spinner />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/together" element={<Together />} />
+          <Route path="/gesture" element={<Navigate to="/together" replace />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/week" element={<Week />} />
+          <Route path="/w/:code" element={<WeekPublicScreen />} />
+          <Route path="/c/:code" element={<Challenge />} />
+          <Route path="/challenge" element={<NewChallenge />} />
+          <Route path="/stats" element={<Stats />} />
+          <Route path="/install" element={<Install />} />
+          <Route path="/levels" element={<Levels />} />
+          <Route path="/topics" element={<Topics />} />
+          <Route path="/capsule" element={<Capsule />} />
+          <Route path="/j/:code" element={<Join />} />
+          <Route path="/f/:code" element={<Friend />} />
+          <Route path="/a/:code" element={<Navigate to="/" replace />} />
+          <Route path="/recommend" element={<Recommend />} />
+          <Route path="/book" element={<Book />} />
+          <Route path="/ideas" element={<Navigate to="/together" replace />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="*" element={<Home />} />
+        </Routes>
+      </Suspense>
       <Nav />
       <Toast />
       <Celebrations />

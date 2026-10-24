@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { APP_NAME_ACC } from '@polovinka/shared';
 import { api } from '../lib/api';
 import { isStandalone, platform } from '../lib/install';
 import { Button, Card, Label } from './ui';
-import { QrCode } from './Qr';
+
+// Генератор QR нужен только на компьютере — не тащим его в основной кусок
+const QrCode = lazy(() => import('./Qr').then((m) => ({ default: m.QrCode })));
 
 const KEY = 'polovinka.desktopHandoff.dismissedAt';
 
@@ -54,7 +56,9 @@ export function DesktopHandoffCard() {
       {url ? (
         <div className="mt-4 flex flex-col items-center">
           <div className="rounded-2xl bg-white p-2">
-            <QrCode text={url} size={200} label="QR-код для входа с телефона" />
+            <Suspense fallback={<div style={{ width: 200, height: 200 }} />}>
+              <QrCode text={url} size={200} label="QR-код для входа с телефона" />
+            </Suspense>
           </div>
           <p className="mt-3 text-center text-xs text-muted">Наведите камеру телефона. Код одноразовый — не показывайте его посторонним.</p>
         </div>
