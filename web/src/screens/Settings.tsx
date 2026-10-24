@@ -269,6 +269,7 @@ export function Settings() {
           </Button>
         </div>
       </Sheet>
+      <p className="mt-6 text-center text-[11px] text-muted">Половинка · сборка {__BUILD__}</p>
     </div>
   );
 }

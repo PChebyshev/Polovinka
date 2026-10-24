@@ -27,7 +27,15 @@ export async function flushNow(): Promise<void> {
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
   void saveTokenForSw(getToken());
-  navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+  const startedAt = Date.now();
+  // Новая версия: пока страница только открылась — перезагружаемся на неё сразу, иначе подхватится при следующем запуске
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (Date.now() - startedAt < 20_000 && document.visibilityState === 'visible') location.reload();
+  });
+  navigator.serviceWorker
+    .register('/sw.js', { updateViaCache: 'none' })
+    .then((reg) => reg.update().catch(() => undefined))
+    .catch(() => undefined);
   navigator.serviceWorker.addEventListener('message', (e) => {
     const d = e.data as { type?: string; sent?: number };
     if (d?.type === 'flushed') for (const l of listeners) l(d.sent ?? 0);

@@ -30,7 +30,11 @@ function serviceWorker(): Plugin {
   };
 }
 
+/** Дата сборки — показывается внизу настроек, чтобы понимать, какая версия на телефоне. */
+const BUILD = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).replace('.', '');
+
 export default defineConfig({
+  define: { __BUILD__: JSON.stringify(BUILD) },
   plugins: [react(), tailwindcss(), serviceWorker()],
   server: {
     port: 5173,
