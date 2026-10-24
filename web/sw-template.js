@@ -23,6 +23,25 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/** Сеть, но не дольше ms: на плохой сети (VPN, слабый сигнал) лучше показать кэш, чем вечный спиннер. */
+function fetchWithTimeout(req, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    fetch(req).then(
+      (res) => {
+        clearTimeout(timer);
+        resolve(res);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
+const NAVIGATE_TIMEOUT = 6000;
+const API_TIMEOUT = 10000;
+
 function withCacheHeader(res) {
   const h = new Headers(res.headers);
   h.set('x-sw-cache', '1');
@@ -40,22 +59,28 @@ self.addEventListener('fetch', (event) => {
     const snapshot = API_SNAPSHOT.includes(url.pathname);
     if (!snapshot) return;
     // Снимок последнего состояния: сеть, при её отсутствии — кэш с пометкой.
+    const live = fetch(req).then((res) => {
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(API_CACHE).then((c) => c.put(stripToken(req), copy));
+      }
+      return res;
+    });
     event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(API_CACHE).then((c) => c.put(stripToken(req), copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match(stripToken(req)).then((hit) => (hit ? withCacheHeader(hit) : Response.error()))),
+      fetchWithTimeout(req, API_TIMEOUT).catch(() =>
+        caches.match(stripToken(req)).then((hit) => (hit ? withCacheHeader(hit) : live.catch(() => Response.error()))),
+      ),
     );
+    // Ответ сети всё равно дойдёт до кэша, даже если показали старый снимок
+    event.waitUntil(live.catch(() => undefined));
     return;
   }
 
   if (req.mode === 'navigate') {
-    event.respondWith(fetch(req).catch(() => caches.match('/index.html')));
+    // Оболочка из кэша, если сеть не ответила за 6 секунд; без кэша — ждём сеть
+    const live = fetch(req);
+    event.respondWith(fetchWithTimeout(req, NAVIGATE_TIMEOUT).catch(() => caches.match('/index.html').then((hit) => hit || live)));
+    event.waitUntil(live.catch(() => undefined));
     return;
   }
 

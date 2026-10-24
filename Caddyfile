@@ -1,3 +1,11 @@
+# HTTP/3 выключен: UDP 443 наружу не открыт, а объявленный h3 заставляет браузер через VPN
+# (где UDP часто глохнет без ответа) ждать таймаут QUIC, прежде чем открыть сайт по TCP.
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
 {$DOMAIN} {
 	encode zstd gzip
 	reverse_proxy app:8787 {

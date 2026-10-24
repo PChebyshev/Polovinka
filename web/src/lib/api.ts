@@ -45,7 +45,8 @@ async function request<T>(method: string, path: string, body?: unknown, opts: { 
   if (body !== undefined) headers['content-type'] = 'application/json';
   let res: Response;
   try {
-    res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    // Не ждать вечно: через VPN или на слабой сети лучше ошибка (и очередь для ответов), чем бесконечный спиннер
+    res = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(method === 'GET' ? 25_000 : 20_000) });
   } catch (e) {
     if (opts.queue && body !== undefined) {
       await enqueue({ method: method as 'POST', path, body: JSON.stringify(body) });
